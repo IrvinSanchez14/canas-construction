@@ -5,6 +5,14 @@ from app.schemas.client import ClientCreate, ClientUpdate, ClientResponse
 from app.schemas.project_category import ProjectCategoryCreate, ProjectCategoryUpdate, ProjectCategoryResponse
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
 from app.schemas.catalog_item import CatalogItemCreate, CatalogItemUpdate, CatalogItemResponse, CatalogItemDetailResponse
+from app.schemas.auth import (
+    LoginRequest,
+    TokenResponse,
+    RefreshTokenRequest,
+    TokenPayload,
+    CompanySetupRequest,
+    CompanySetupResponse
+)
 
 __all__ = [
     "CompanyCreate",
@@ -31,4 +39,10 @@ __all__ = [
     "CatalogItemUpdate",
     "CatalogItemResponse",
     "CatalogItemDetailResponse",
+    "LoginRequest",
+    "TokenResponse",
+    "RefreshTokenRequest",
+    "TokenPayload",
+    "CompanySetupRequest",
+    "CompanySetupResponse",
 ]
