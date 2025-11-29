@@ -15,7 +15,8 @@ from app.models import Project, ProjectStatus
 from app.repositories import (
     ProjectRepository,
     ClientRepository,
-    ProjectCategoryRepository
+    ProjectCategoryRepository,
+    UserRepository
 )
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.core.exceptions import (
@@ -35,38 +36,48 @@ class ProjectService:
     - ProjectRepository: Data access
     - ClientRepository: Client validation
     - ProjectCategoryRepository: Category validation
+    - UserRepository: User validation for creator tracking
     """
 
     def __init__(
         self,
         project_repository: ProjectRepository,
         client_repository: ClientRepository,
-        project_category_repository: ProjectCategoryRepository
+        project_category_repository: ProjectCategoryRepository,
+        user_repository: UserRepository
     ):
         """Initialize service with all dependencies injected."""
         self.project_repository = project_repository
         self.client_repository = client_repository
         self.project_category_repository = project_category_repository
+        self.user_repository = user_repository
 
-    def create_project(self, project_data: ProjectCreate, company_id: UUID) -> Project:
+    def create_project(
+        self,
+        project_data: ProjectCreate,
+        company_id: UUID,
+        created_by_user_id: Optional[UUID] = None
+    ) -> Project:
         """
         Create a new project.
 
         Business Rules:
         - Client must exist and belong to the company
         - Category must exist and belong to the company
+        - Creator user must exist and belong to the company
         - Multi-tenant isolation enforced
 
         Args:
             project_data: Project creation data
             company_id: Company ID for multi-tenant validation
+            created_by_user_id: User ID who is creating this project (for audit)
 
         Returns:
             Created project
 
         Raises:
-            NotFoundException: If client or category not found
-            ValidationException: If client or category doesn't belong to company
+            NotFoundException: If client, category, or user not found
+            ValidationException: If client, category, or user doesn't belong to company
         """
         logger.info(f"Creating project: {project_data.name} for company {company_id}")
 
@@ -90,6 +101,21 @@ class ProjectService:
                 f"ProjectCategory {project_data.category_id} does not belong to company {company_id}"
             )
 
+        # Use provided creator or fallback to project_data
+        creator_id = created_by_user_id or project_data.created_by_user_id
+
+        # Validate creator user if provided
+        if creator_id:
+            user = self.user_repository.get_by_id(creator_id)
+            if not user:
+                raise NotFoundException("User", creator_id)
+
+            # Validate user belongs to the company
+            if user.company_id != company_id:
+                raise ValidationException(
+                    f"User {creator_id} does not belong to company {company_id}"
+                )
+
         # Create project
         project = self.project_repository.create(
             name=project_data.name,
@@ -102,7 +128,8 @@ class ProjectService:
             actual_completion_date=project_data.actual_completion_date,
             address=project_data.address,
             client_id=project_data.client_id,
-            category_id=project_data.category_id
+            category_id=project_data.category_id,
+            created_by_user_id=creator_id
         )
 
         logger.info(f"Project created successfully: {project.id}")

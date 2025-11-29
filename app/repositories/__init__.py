@@ -5,6 +5,7 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.client_repository import ClientRepository
 from app.repositories.project_category_repository import ProjectCategoryRepository
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.catalog_item_repository import CatalogItemRepository
 
 __all__ = [
     "BaseRepository",
@@ -14,4 +15,5 @@ __all__ = [
     "ClientRepository",
     "ProjectCategoryRepository",
     "ProjectRepository",
+    "CatalogItemRepository",
 ]

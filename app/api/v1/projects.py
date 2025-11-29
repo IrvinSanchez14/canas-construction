@@ -23,6 +23,7 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 def create_project(
     project: ProjectCreate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID who is creating this project (for audit trail)"),
     service: ProjectService = Depends(get_project_service)
 ):
     """
@@ -31,9 +32,14 @@ def create_project(
     Business rules enforced:
     - Client must exist and belong to the company
     - Category must exist and belong to the company
+    - Creator user must belong to the company
     - Multi-tenant isolation enforced
+
+    **Audit Trail:**
+    - Tracks which user created the project via created_by_user_id
+    - Useful for accountability and tracking project history
     """
-    return service.create_project(project, company_id)
+    return service.create_project(project, company_id, created_by_user_id)
 
 
 @router.get("/", response_model=List[ProjectDetailResponse])
@@ -45,6 +51,7 @@ def list_projects(
     category_id: Optional[UUID] = Query(None, description="Filter by category ID"),
     client_id: Optional[UUID] = Query(None, description="Filter by client ID"),
     include_details: bool = Query(True, description="Include client and category details"),
+    include_creator: bool = Query(True, description="Include creator details (user who created the project)"),
     service: ProjectService = Depends(get_project_service)
 ):
     """
@@ -52,7 +59,7 @@ def list_projects(
 
     **IMPORTANT for CRM:**
     - company_id is REQUIRED for multi-tenant isolation
-    - Client and category are eagerly loaded (N+1 query optimization)
+    - Client, category, and creator are eagerly loaded (N+1 query optimization)
     - Can filter by status, category, or client
     - Uses optimized repository methods
 
@@ -68,8 +75,11 @@ def list_projects(
     - completed: Project finished
     - cancelled: Project cancelled
     - on_hold: Temporarily paused
+
+    **Audit Trail:**
+    - Include creator details to see who created each project
     """
-    return service.get_projects(
+    projects = service.get_projects(
         company_id=company_id,
         skip=skip,
         limit=limit,
@@ -79,20 +89,35 @@ def list_projects(
         include_details=include_details
     )
 
+    # Convert to detail response with creator names
+    if include_creator:
+        return [ProjectDetailResponse.from_orm_with_creator(project) for project in projects]
+    else:
+        return projects
+
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 def get_project(
     project_id: UUID,
     company_id: Optional[UUID] = Query(None, description="Filter by company ID"),
+    include_creator: bool = Query(True, description="Include creator details"),
     service: ProjectService = Depends(get_project_service)
 ):
     """
     Get a specific project by ID.
 
-    Includes client and category with eager loading (optimized).
+    Includes client, category, and creator with eager loading (optimized).
     Validates company ownership if company_id provided.
+
+    **Audit Trail:**
+    - Include creator details to see who created the project
     """
-    return service.get_project(project_id, company_id, include_details=True)
+    project = service.get_project(project_id, company_id, include_details=True)
+
+    if include_creator:
+        return ProjectDetailResponse.from_orm_with_creator(project)
+    else:
+        return project
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)

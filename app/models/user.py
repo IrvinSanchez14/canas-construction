@@ -33,6 +33,8 @@ class User(BaseModel):
     # Relationships
     company = relationship("Company", back_populates="users")
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    created_catalog_items = relationship("CatalogItem", back_populates="created_by", foreign_keys="CatalogItem.created_by_user_id")
+    created_projects = relationship("Project", foreign_keys="Project.created_by_user_id")
 
     @property
     def full_name(self):

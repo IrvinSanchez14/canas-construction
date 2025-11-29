@@ -22,9 +22,15 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    """Schema for creating a new project."""
+    """
+    Schema for creating a new project.
+
+    Note: created_by_user_id will be set by the service layer
+    based on authentication context.
+    """
     client_id: UUID
     category_id: UUID
+    created_by_user_id: Optional[UUID] = None  # Will be set by service if not provided
 
 
 class ProjectUpdate(BaseModel):
@@ -46,6 +52,7 @@ class ProjectResponse(ProjectBase):
     id: UUID
     client_id: UUID
     category_id: UUID
+    created_by_user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -53,8 +60,24 @@ class ProjectResponse(ProjectBase):
 
 
 class ProjectDetailResponse(ProjectResponse):
-    """Schema for detailed project response with relationships."""
+    """
+    Schema for detailed project response with relationships.
+
+    Includes client, category, and creator information for full audit trail.
+    """
     client: ClientResponse
     category: ProjectCategoryResponse
+    created_by_name: Optional[str] = Field(None, description="Full name of the user who created this project")
 
     model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm_with_creator(cls, project):
+        """Create response with creator's full name."""
+        data = {
+            **project.__dict__,
+            "created_by_name": project.created_by.full_name if project.created_by else None,
+            "client": project.client,
+            "category": project.category
+        }
+        return cls(**data)

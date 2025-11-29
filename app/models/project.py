@@ -63,9 +63,18 @@ class Project(BaseModel):
         index=True
     )
 
+    # Foreign key to user who created this project (audit trail)
+    created_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,  # NULL if user is deleted
+        index=True
+    )
+
     # Relationships
     client = relationship("Client", back_populates="projects")
     category = relationship("ProjectCategory", back_populates="projects")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', status={self.status}, client_id={self.client_id})>"

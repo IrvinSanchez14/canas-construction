@@ -4,6 +4,7 @@ from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserLogin
 from app.schemas.client import ClientCreate, ClientUpdate, ClientResponse
 from app.schemas.project_category import ProjectCategoryCreate, ProjectCategoryUpdate, ProjectCategoryResponse
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
+from app.schemas.catalog_item import CatalogItemCreate, CatalogItemUpdate, CatalogItemResponse, CatalogItemDetailResponse
 
 __all__ = [
     "CompanyCreate",
@@ -26,4 +27,8 @@ __all__ = [
     "ProjectUpdate",
     "ProjectResponse",
     "ProjectDetailResponse",
+    "CatalogItemCreate",
+    "CatalogItemUpdate",
+    "CatalogItemResponse",
+    "CatalogItemDetailResponse",
 ]

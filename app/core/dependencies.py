@@ -22,7 +22,8 @@ from app.repositories import (
     UserRepository,
     ClientRepository,
     ProjectCategoryRepository,
-    ProjectRepository
+    ProjectRepository,
+    CatalogItemRepository
 )
 from app.services import (
     CompanyService,
@@ -30,7 +31,8 @@ from app.services import (
     UserService,
     ClientService,
     ProjectCategoryService,
-    ProjectService
+    ProjectService,
+    CatalogItemService
 )
 from app.core.password import PasswordHasher, password_hasher
 
@@ -190,9 +192,37 @@ def get_project_service(db: Session = Depends(get_db)) -> ProjectService:
     project_repo = get_project_repository(db)
     client_repo = get_client_repository(db)
     category_repo = get_project_category_repository(db)
+    user_repo = get_user_repository(db)
 
     return ProjectService(
         project_repository=project_repo,
         client_repository=client_repo,
-        project_category_repository=category_repo
+        project_category_repository=category_repo,
+        user_repository=user_repo
+    )
+
+
+def get_catalog_item_repository(db: Session = Depends(get_db)) -> CatalogItemRepository:
+    """Get CatalogItem repository instance."""
+    return CatalogItemRepository(db)
+
+
+def get_catalog_item_service(db: Session = Depends(get_db)) -> CatalogItemService:
+    """
+    Get CatalogItemService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured CatalogItemService instance
+    """
+    catalog_item_repo = get_catalog_item_repository(db)
+    company_repo = get_company_repository(db)
+    user_repo = get_user_repository(db)
+
+    return CatalogItemService(
+        catalog_item_repository=catalog_item_repo,
+        company_repository=company_repo,
+        user_repository=user_repo
     )

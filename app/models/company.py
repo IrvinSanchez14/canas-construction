@@ -19,6 +19,7 @@ class Company(BaseModel):
     roles = relationship("Role", back_populates="company", cascade="all, delete-orphan")
     clients = relationship("Client", back_populates="company", cascade="all, delete-orphan")
     project_categories = relationship("ProjectCategory", back_populates="company", cascade="all, delete-orphan")
+    catalog_items = relationship("CatalogItem", back_populates="company", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Company(id={self.id}, name='{self.name}')>"

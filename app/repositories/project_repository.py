@@ -14,19 +14,25 @@ class ProjectRepository(BaseRepository[Project]):
     def __init__(self, db: Session):
         super().__init__(Project, db)
 
-    def get_by_id_with_details(self, project_id: UUID) -> Optional[Project]:
-        """Get project by ID with client and category eagerly loaded (N+1 optimization)."""
-        return self.db.query(Project).options(
+    def get_by_id_with_details(self, project_id: UUID, include_creator: bool = True) -> Optional[Project]:
+        """Get project by ID with client, category, and creator eagerly loaded (N+1 optimization)."""
+        query = self.db.query(Project).options(
             joinedload(Project.client),
             joinedload(Project.category)
-        ).filter(Project.id == project_id).first()
+        )
+
+        if include_creator:
+            query = query.options(joinedload(Project.created_by))
+
+        return query.filter(Project.id == project_id).first()
 
     def get_by_client(
         self,
         client_id: UUID,
         skip: int = 0,
         limit: int = 100,
-        include_details: bool = True
+        include_details: bool = True,
+        include_creator: bool = True
     ) -> List[Project]:
         """
         Get all projects for a specific client.
@@ -36,6 +42,7 @@ class ProjectRepository(BaseRepository[Project]):
             skip: Pagination offset
             limit: Pagination limit
             include_details: Whether to eager load client and category
+            include_creator: Whether to eager load creator user
         """
         query = self.db.query(Project).filter(Project.client_id == client_id)
 
@@ -44,6 +51,9 @@ class ProjectRepository(BaseRepository[Project]):
                 joinedload(Project.client),
                 joinedload(Project.category)
             )
+
+        if include_creator:
+            query = query.options(joinedload(Project.created_by))
 
         return query.offset(skip).limit(limit).all()
 
@@ -54,7 +64,8 @@ class ProjectRepository(BaseRepository[Project]):
         limit: int = 100,
         status: Optional[ProjectStatus] = None,
         category_id: Optional[UUID] = None,
-        include_details: bool = True
+        include_details: bool = True,
+        include_creator: bool = True
     ) -> List[Project]:
         """
         Get all projects for a company through client relationship.
@@ -66,6 +77,7 @@ class ProjectRepository(BaseRepository[Project]):
             status: Optional status filter
             category_id: Optional category filter
             include_details: Whether to eager load relationships
+            include_creator: Whether to eager load creator user
         """
         from app.models import Client
 
@@ -84,6 +96,9 @@ class ProjectRepository(BaseRepository[Project]):
                 joinedload(Project.client),
                 joinedload(Project.category)
             )
+
+        if include_creator:
+            query = query.options(joinedload(Project.created_by))
 
         return query.offset(skip).limit(limit).all()
 
