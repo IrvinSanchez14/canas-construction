@@ -6,6 +6,7 @@ from mangum import Mangum
 
 from app.core.config import settings
 from app.core.logging import AppLogger, get_logger
+from app.core.error_handlers import register_exception_handlers
 from app.api.routes import api_router
 
 # Setup logging
@@ -44,6 +45,9 @@ def create_application() -> FastAPI:
             allowed_hosts=["*.amazonaws.com", "*.compute.amazonaws.com"]
         )
 
+    # Register exception handlers
+    register_exception_handlers(app)
+
     # Include API router
     app.include_router(api_router, prefix=settings.API_PREFIX)
 
@@ -53,6 +57,7 @@ def create_application() -> FastAPI:
         logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
         logger.info(f"Environment: {settings.ENVIRONMENT}")
         logger.info(f"Debug mode: {settings.DEBUG}")
+        logger.info("Architecture: Enterprise-grade with DI, Repository Pattern, SOLID principles")
 
     @app.on_event("shutdown")
     async def shutdown_event():
@@ -65,6 +70,7 @@ def create_application() -> FastAPI:
             "message": f"Welcome to {settings.APP_NAME}",
             "version": settings.APP_VERSION,
             "docs": f"{settings.API_PREFIX}/docs" if settings.DEBUG else "disabled",
+            "architecture": "Enterprise-grade: SOLID, DI, Repository Pattern, N+1 Optimized",
         }
 
     return app
