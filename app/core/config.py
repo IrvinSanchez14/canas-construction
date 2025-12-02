@@ -32,7 +32,13 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
 
     # CORS - Allow JSON string for AWS environment variables
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    # Default includes common development ports: React (3000), Vite (5173), Next.js (3000)
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

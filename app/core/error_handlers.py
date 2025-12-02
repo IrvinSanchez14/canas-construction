@@ -5,7 +5,7 @@ Converts custom exceptions to proper HTTP responses automatically.
 """
 
 from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -19,6 +19,7 @@ from app.core.exceptions import (
     DatabaseException
 )
 from app.core.logging import get_logger
+from app.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -145,6 +146,20 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
     These occur when request data doesn't match schema.
     """
+    # Handle OPTIONS requests with CORS headers manually
+    # Error handlers run after middleware, so we need to add CORS headers ourselves
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin")
+        if origin and origin in settings.CORS_ORIGINS:
+            response = Response(status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            return response
+        return Response(status_code=200)
+
     logger.warning(f"Request validation error: {exc.errors()}")
 
     return JSONResponse(
@@ -209,6 +224,20 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     This prevents exposing internal errors to users.
     """
+    # Handle OPTIONS requests with CORS headers manually
+    # Error handlers run after middleware, so we need to add CORS headers ourselves
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin")
+        if origin and origin in settings.CORS_ORIGINS:
+            response = Response(status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            return response
+        return Response(status_code=200)
+
     logger.exception(
         f"Unhandled exception: {str(exc)}",
         extra={"path": request.url.path, "method": request.method}
