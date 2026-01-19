@@ -85,7 +85,12 @@ def create_application() -> FastAPI:
     if settings.is_production:
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=["*.amazonaws.com", "*.compute.amazonaws.com"]
+            allowed_hosts=[
+                "*.amazonaws.com",
+                "*.compute.amazonaws.com",
+                "*.onrender.com",
+                "localhost",
+            ]
         )
 
     # Register exception handlers
