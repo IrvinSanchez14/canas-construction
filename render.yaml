@@ -29,7 +29,7 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    branch: dev  # Deploy automático cuando haces push a "dev"
+    branch: develop  # Deploy automático cuando haces push a "develop"
     healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
