@@ -7,7 +7,7 @@ We're migrating from the simple service layer to the improved architecture with:
 - Dependency Injection
 - Custom Exceptions
 - Caching Layer
-- Proper Logging
+- Proper Logging 
 
 ---
 
@@ -25,7 +25,7 @@ We're migrating from the simple service layer to the improved architecture with:
 - [ ] Create improved Role service
 - [ ] Create improved API endpoints
 - [ ] Add global exception handler
-- [ ] Update routes
+- [ ] Update rout
 
 ### 🔄 Step 3: Add Authentication (NEXT)
 - [ ] JWT token generation

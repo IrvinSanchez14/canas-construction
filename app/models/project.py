@@ -75,6 +75,7 @@ class Project(BaseModel):
     client = relationship("Client", back_populates="projects")
     category = relationship("ProjectCategory", back_populates="projects")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    visits = relationship("Visit", back_populates="project", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', status={self.status}, client_id={self.client_id})>"

@@ -6,6 +6,8 @@ from app.repositories.client_repository import ClientRepository
 from app.repositories.project_category_repository import ProjectCategoryRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.catalog_item_repository import CatalogItemRepository
+from app.repositories.visit_repository import VisitRepository
+from app.repositories.budget_repository import BudgetRepository, BudgetItemRepository
 
 __all__ = [
     "BaseRepository",
@@ -16,4 +18,7 @@ __all__ = [
     "ProjectCategoryRepository",
     "ProjectRepository",
     "CatalogItemRepository",
+    "VisitRepository",
+    "BudgetRepository",
+    "BudgetItemRepository",
 ]

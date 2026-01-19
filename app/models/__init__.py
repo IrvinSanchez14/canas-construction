@@ -6,6 +6,8 @@ from app.models.client import Client
 from app.models.project_category import ProjectCategory
 from app.models.project import Project, ProjectStatus
 from app.models.catalog_item import CatalogItem, UnitType
+from app.models.visit import Visit, VisitStatus
+from app.models.budget import Budget, BudgetItem, BudgetStatus
 
 __all__ = [
     "Base",
@@ -19,5 +21,10 @@ __all__ = [
     "Project",
     "ProjectStatus",
     "CatalogItem",
-    "UnitType"
+    "UnitType",
+    "Visit",
+    "VisitStatus",
+    "Budget",
+    "BudgetItem",
+    "BudgetStatus"
 ]

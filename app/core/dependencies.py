@@ -23,16 +23,21 @@ from app.repositories import (
     ClientRepository,
     ProjectCategoryRepository,
     ProjectRepository,
-    CatalogItemRepository
+    CatalogItemRepository,
+    VisitRepository,
+    BudgetRepository,
+    BudgetItemRepository
 )
 from app.services import (
     CompanyService,
+    BudgetService,
     RoleService,
     UserService,
     ClientService,
     ProjectCategoryService,
     ProjectService,
-    CatalogItemService
+    CatalogItemService,
+    VisitService
 )
 from app.core.password import PasswordHasher, password_hasher
 
@@ -225,4 +230,67 @@ def get_catalog_item_service(db: Session = Depends(get_db)) -> CatalogItemServic
         catalog_item_repository=catalog_item_repo,
         company_repository=company_repo,
         user_repository=user_repo
+    )
+
+
+def get_visit_repository(db: Session = Depends(get_db)) -> VisitRepository:
+    """Get Visit repository instance."""
+    return VisitRepository(db)
+
+
+def get_visit_service(db: Session = Depends(get_db)) -> VisitService:
+    """
+    Get VisitService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured VisitService instance
+    """
+    visit_repo = get_visit_repository(db)
+    project_repo = get_project_repository(db)
+    user_repo = get_user_repository(db)
+
+    return VisitService(
+        visit_repository=visit_repo,
+        project_repository=project_repo,
+        user_repository=user_repo
+    )
+
+
+def get_budget_repository(db: Session = Depends(get_db)) -> BudgetRepository:
+    """Get Budget repository instance."""
+    return BudgetRepository(db)
+
+
+def get_budget_item_repository(db: Session = Depends(get_db)) -> BudgetItemRepository:
+    """Get BudgetItem repository instance."""
+    return BudgetItemRepository(db)
+
+
+def get_budget_service(db: Session = Depends(get_db)) -> BudgetService:
+    """
+    Get BudgetService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured BudgetService instance
+    """
+    budget_repo = get_budget_repository(db)
+    budget_item_repo = get_budget_item_repository(db)
+    visit_repo = get_visit_repository(db)
+    project_repo = get_project_repository(db)
+    user_repo = get_user_repository(db)
+    catalog_item_repo = get_catalog_item_repository(db)
+
+    return BudgetService(
+        budget_repository=budget_repo,
+        budget_item_repository=budget_item_repo,
+        visit_repository=visit_repo,
+        project_repository=project_repo,
+        user_repository=user_repo,
+        catalog_item_repository=catalog_item_repo
     )
