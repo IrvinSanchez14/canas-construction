@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.api import health
-from app.api.v1 import auth, companies, roles, users, clients, project_categories, projects, catalog_items, visits, budgets
+from app.api.v1 import auth, companies, roles, users, clients, project_categories, projects, catalog_items, visits, budgets, renderings, uploads
 
 api_router = APIRouter()
 
@@ -24,3 +24,5 @@ api_router.include_router(projects.router)
 api_router.include_router(catalog_items.router)
 api_router.include_router(visits.router)
 api_router.include_router(budgets.router)
+api_router.include_router(renderings.router)
+api_router.include_router(uploads.router)

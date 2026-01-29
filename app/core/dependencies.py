@@ -26,7 +26,10 @@ from app.repositories import (
     CatalogItemRepository,
     VisitRepository,
     BudgetRepository,
-    BudgetItemRepository
+    BudgetItemRepository,
+    RenderingRepository,
+    RenderingImageRepository,
+    RenderingItemRepository
 )
 from app.services import (
     CompanyService,
@@ -37,7 +40,8 @@ from app.services import (
     ProjectCategoryService,
     ProjectService,
     CatalogItemService,
-    VisitService
+    VisitService,
+    RenderingService
 )
 from app.core.password import PasswordHasher, password_hasher
 
@@ -293,4 +297,50 @@ def get_budget_service(db: Session = Depends(get_db)) -> BudgetService:
         project_repository=project_repo,
         user_repository=user_repo,
         catalog_item_repository=catalog_item_repo
+    )
+
+
+# Rendering Repository Factories
+
+def get_rendering_repository(db: Session = Depends(get_db)) -> RenderingRepository:
+    """Get Rendering repository instance."""
+    return RenderingRepository(db)
+
+
+def get_rendering_image_repository(db: Session = Depends(get_db)) -> RenderingImageRepository:
+    """Get RenderingImage repository instance."""
+    return RenderingImageRepository(db)
+
+
+def get_rendering_item_repository(db: Session = Depends(get_db)) -> RenderingItemRepository:
+    """Get RenderingItem repository instance."""
+    return RenderingItemRepository(db)
+
+
+# Rendering Service Factory
+
+def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
+    """
+    Get RenderingService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured RenderingService instance
+    """
+    rendering_repo = get_rendering_repository(db)
+    rendering_image_repo = get_rendering_image_repository(db)
+    rendering_item_repo = get_rendering_item_repository(db)
+    visit_repo = get_visit_repository(db)
+    budget_repo = get_budget_repository(db)
+    budget_item_repo = get_budget_item_repository(db)
+
+    return RenderingService(
+        rendering_repository=rendering_repo,
+        rendering_image_repository=rendering_image_repo,
+        rendering_item_repository=rendering_item_repo,
+        visit_repository=visit_repo,
+        budget_repository=budget_repo,
+        budget_item_repository=budget_item_repo
     )

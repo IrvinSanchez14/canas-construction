@@ -7,6 +7,7 @@ from app.services.project_service import ProjectService
 from app.services.catalog_item_service import CatalogItemService
 from app.services.visit_service import VisitService
 from app.services.budget_service import BudgetService
+from app.services.rendering_service import RenderingService
 
 __all__ = [
     "CompanyService",
@@ -18,4 +19,5 @@ __all__ = [
     "CatalogItemService",
     "VisitService",
     "BudgetService",
+    "RenderingService",
 ]

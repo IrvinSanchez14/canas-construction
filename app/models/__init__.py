@@ -8,6 +8,7 @@ from app.models.project import Project, ProjectStatus
 from app.models.catalog_item import CatalogItem, UnitType
 from app.models.visit import Visit, VisitStatus
 from app.models.budget import Budget, BudgetItem, BudgetStatus
+from app.models.rendering import Rendering, RenderingImage, RenderingItem, RenderingStatus
 
 __all__ = [
     "Base",
@@ -26,5 +27,9 @@ __all__ = [
     "VisitStatus",
     "Budget",
     "BudgetItem",
-    "BudgetStatus"
+    "BudgetStatus",
+    "Rendering",
+    "RenderingImage",
+    "RenderingItem",
+    "RenderingStatus"
 ]
