@@ -133,6 +133,34 @@ class ProjectService:
         )
 
         logger.info(f"Project created successfully: {project.id}")
+        
+        # Send notification
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+            
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.project_repository.db,
+                    "project.created",
+                    "Project",
+                    project.id,
+                    project.name,
+                    company_id,
+                    None,  # created_by
+                    {
+                        "Client": client.name,
+                        "Category": category.name,
+                        "Status": project.status.value,
+                        "Estimated Budget": f"${project.estimated_budget:,.2f}" if project.estimated_budget else "N/A"
+                    }
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+        
         return project
 
     def get_project(

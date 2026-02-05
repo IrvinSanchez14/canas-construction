@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # Resend Email Configuration
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "notifications@canas-construction.com"
+    RESEND_FROM_NAME: str = "Canas Construction Notifications"
+
+    # Feature Flags
+    NOTIFICATIONS_ENABLED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

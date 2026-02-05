@@ -72,6 +72,33 @@ class ClientService:
         )
 
         logger.info(f"Client created successfully: {client.id}")
+        
+        # Send notification asynchronously (non-blocking)
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+            
+            # Run notification in background thread
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.client_repository.db,
+                    "client.created",
+                    "Client",
+                    client.id,
+                    client.name,
+                    client.company_id,
+                    None,  # created_by - TODO: Get from auth context
+                    {
+                        "Email": client.email or "N/A",
+                        "Phone": client.phone or "N/A"
+                    }
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+        
         return client
 
     def get_client(self, client_id: UUID, company_id: Optional[UUID] = None) -> Client:

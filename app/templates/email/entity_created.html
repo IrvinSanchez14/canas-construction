@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}New {{ entity_type }} Created{% endblock %}
+
+{% block content %}
+<div class="content">
+    <p><span class="badge">New</span></p>
+    
+    <h2 style="color: #111827; margin: 10px 0;">
+        New {{ entity_type }} Created
+    </h2>
+    
+    <p style="font-size: 16px; color: #4b5563;">
+        A new <strong>{{ entity_type }}</strong> has been created in the system.
+    </p>
+    
+    <div class="details">
+        <div class="details-item">
+            <span class="details-label">{{ entity_type }} Name:</span>
+            <span>{{ entity_name }}</span>
+        </div>
+        
+        <div class="details-item">
+            <span class="details-label">Created:</span>
+            <span>{{ created_at }}</span>
+        </div>
+        
+        {% if created_by %}
+        <div class="details-item">
+            <span class="details-label">Created By:</span>
+            <span>{{ created_by }}</span>
+        </div>
+        {% endif %}
+        
+        {% if details %}
+            {% for key, value in details.items() %}
+            <div class="details-item">
+                <span class="details-label">{{ key|title }}:</span>
+                <span>{{ value }}</span>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+    
+    <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+        Log in to your account to view more details.
+    </p>
+</div>
+{% endblock %}
