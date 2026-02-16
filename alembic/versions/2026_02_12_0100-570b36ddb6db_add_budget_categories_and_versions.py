@@ -3,7 +3,7 @@
 Restructure budgets: Budget → Categories → Items
 Add budget versioning with JSON snapshots.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 570b36ddb6db
 Revises: 49115b4ac9f8
 Create Date: 2026-02-12 01:00:00.000000+00:00
 
@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 import uuid
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
+revision: str = '570b36ddb6db'
 down_revision: Union[str, None] = '49115b4ac9f8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
