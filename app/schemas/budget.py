@@ -4,11 +4,13 @@ from typing import Optional, List
 from uuid import UUID
 from decimal import Decimal
 from app.models.budget import BudgetStatus
+from app.schemas.category_profit import CategoryProfitResponse
 
+
+# --- Budget Item Schemas ---
 
 class BudgetItemBase(BaseModel):
     """Base schema for BudgetItem."""
-    section_name: Optional[str] = None
     description: str
     unit: Optional[str] = None
     quantity: Decimal = Field(..., decimal_places=2, gt=0)
@@ -38,7 +40,6 @@ class BudgetItemCreate(BudgetItemBase):
 
 class BudgetItemUpdate(BaseModel):
     """Schema for updating a budget item."""
-    section_name: Optional[str] = None
     description: Optional[str] = None
     unit: Optional[str] = None
     quantity: Optional[Decimal] = Field(None, decimal_places=2, gt=0)
@@ -53,7 +54,7 @@ class BudgetItemUpdate(BaseModel):
 class BudgetItemResponse(BudgetItemBase):
     """Schema for budget item response."""
     id: UUID
-    budget_id: UUID
+    budget_category_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -76,6 +77,60 @@ class BudgetItemDetailResponse(BudgetItemResponse):
         return cls(**data)
 
 
+# --- Budget Category Schemas ---
+
+class BudgetCategoryCreate(BaseModel):
+    """Schema for creating a budget category with items."""
+    name: str
+    description: Optional[str] = None
+    images: Optional[List[str]] = None
+    order_index: int = Field(default=0, ge=0)
+    items: Optional[List[BudgetItemCreate]] = Field(default_factory=list)
+
+    @field_validator('images')
+    @classmethod
+    def validate_images(cls, v):
+        if v and len(v) > 3:
+            raise ValueError("Maximum 3 images allowed per category")
+        return v
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BudgetCategoryDetailResponse(BaseModel):
+    """Schema for budget category response with items and profit data."""
+    id: UUID
+    budget_id: UUID
+    name: str
+    description: Optional[str] = None
+    images: Optional[List[str]] = None
+    order_index: int
+    subtotal: Decimal
+    budget_items: List[BudgetItemDetailResponse] = Field(default_factory=list)
+    category_profit: Optional[CategoryProfitResponse] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm_with_details(cls, category):
+        data = {
+            **category.__dict__,
+            "budget_items": [
+                BudgetItemDetailResponse.from_orm_with_details(item)
+                for item in category.budget_items
+            ],
+            "category_profit": (
+                CategoryProfitResponse.from_orm_with_details(category.category_profit)
+                if category.category_profit else None
+            ),
+        }
+        return cls(**data)
+
+
+# --- Budget Schemas ---
+
 class BudgetBase(BaseModel):
     """Base schema for Budget."""
     title: str
@@ -87,9 +142,9 @@ class BudgetBase(BaseModel):
 
 
 class BudgetCreate(BudgetBase):
-    """Schema for creating a new budget."""
+    """Schema for creating a new budget with categories and items."""
     visit_id: UUID
-    budget_items: Optional[List[BudgetItemCreate]] = Field(default_factory=list)
+    categories: Optional[List[BudgetCategoryCreate]] = Field(default_factory=list)
 
 
 class BudgetUpdate(BaseModel):
@@ -106,6 +161,7 @@ class BudgetResponse(BudgetBase):
     """Schema for budget response."""
     id: UUID
     visit_id: UUID
+    current_version: int = 0
     accepted_by_user_id: Optional[UUID] = None
     accepted_at: Optional[datetime] = None
     created_at: datetime
@@ -115,20 +171,20 @@ class BudgetResponse(BudgetBase):
 
 
 class BudgetDetailResponse(BudgetResponse):
-    """Schema for detailed budget response with items."""
-    budget_items: List[BudgetItemDetailResponse] = Field(default_factory=list)
+    """Schema for detailed budget response with categories and items."""
+    budget_categories: List[BudgetCategoryDetailResponse] = Field(default_factory=list)
     accepted_by_name: Optional[str] = Field(None, description="Name of user who accepted the budget")
 
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_orm_with_details(cls, budget):
-        """Create response with items and accepted_by name."""
+        """Create response with categories, items, and accepted_by name."""
         data = {
             **budget.__dict__,
-            "budget_items": [
-                BudgetItemDetailResponse.from_orm_with_details(item)
-                for item in budget.budget_items
+            "budget_categories": [
+                BudgetCategoryDetailResponse.from_orm_with_details(cat)
+                for cat in budget.budget_categories
             ],
             "accepted_by_name": budget.accepted_by.full_name if budget.accepted_by else None,
         }

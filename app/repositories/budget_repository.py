@@ -7,6 +7,8 @@ from uuid import UUID
 from decimal import Decimal
 
 from app.models import Budget, BudgetItem, BudgetStatus
+from app.models.budget_category import BudgetCategory
+from app.models.category_profit import CategoryProfit
 from app.repositories.base import BaseRepository
 
 
@@ -16,30 +18,38 @@ class BudgetRepository(BaseRepository[Budget]):
     def __init__(self, db: Session):
         super().__init__(Budget, db)
 
-    def get_by_id_with_details(self, budget_id: UUID, include_items: bool = True) -> Optional[Budget]:
-        """Get budget by ID with visit and items eagerly loaded (N+1 optimization)."""
+    def get_by_id_with_details(self, budget_id: UUID, include_categories: bool = True) -> Optional[Budget]:
+        """Get budget by ID with categories, items, and visit eagerly loaded."""
         from app.models.visit import Visit
         from app.models.project import Project
-        
+
         query = self.db.query(Budget).options(
             joinedload(Budget.visit).joinedload(Visit.project).joinedload(Project.client),
             joinedload(Budget.accepted_by)
         )
 
-        if include_items:
+        if include_categories:
             query = query.options(
-                joinedload(Budget.budget_items).joinedload(BudgetItem.catalog_item)
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.budget_items)
+                .joinedload(BudgetItem.catalog_item),
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.category_profit)
             )
 
         return query.filter(Budget.id == budget_id).first()
 
-    def get_by_visit(self, visit_id: UUID, include_items: bool = True) -> Optional[Budget]:
+    def get_by_visit(self, visit_id: UUID, include_categories: bool = True) -> Optional[Budget]:
         """Get budget for a specific visit."""
         query = self.db.query(Budget).filter(Budget.visit_id == visit_id)
 
-        if include_items:
+        if include_categories:
             query = query.options(
-                joinedload(Budget.budget_items).joinedload(BudgetItem.catalog_item),
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.budget_items)
+                .joinedload(BudgetItem.catalog_item),
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.category_profit),
                 joinedload(Budget.accepted_by)
             )
 
@@ -50,14 +60,16 @@ class BudgetRepository(BaseRepository[Budget]):
         status: BudgetStatus,
         skip: int = 0,
         limit: int = 100,
-        include_items: bool = False
+        include_categories: bool = False
     ) -> List[Budget]:
         """Get all budgets with a specific status."""
         query = self.db.query(Budget).filter(Budget.status == status)
 
-        if include_items:
+        if include_categories:
             query = query.options(
-                joinedload(Budget.budget_items).joinedload(BudgetItem.catalog_item)
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.budget_items)
+                .joinedload(BudgetItem.catalog_item)
             )
 
         return query.offset(skip).limit(limit).all()
@@ -72,22 +84,13 @@ class BudgetRepository(BaseRepository[Budget]):
         skip: int = 0,
         limit: int = 100,
         status: Optional[BudgetStatus] = None,
-        include_items: bool = True
+        include_categories: bool = True
     ) -> List[Budget]:
-        """
-        Get all budgets for a company by joining through visits -> projects -> clients.
-        
-        Args:
-            company_id: Company ID to filter by
-            skip: Pagination offset
-            limit: Pagination limit
-            status: Optional status filter
-            include_items: Whether to eager load budget items
-        """
+        """Get all budgets for a company by joining through visits -> projects -> clients."""
         from app.models.visit import Visit
         from app.models.project import Project
         from app.models.client import Client
-        
+
         query = (
             self.db.query(Budget)
             .join(Budget.visit)
@@ -95,25 +98,29 @@ class BudgetRepository(BaseRepository[Budget]):
             .join(Project.client)
             .filter(Client.company_id == company_id)
         )
-        
+
         if status:
             query = query.filter(Budget.status == status)
-        
-        if include_items:
+
+        if include_categories:
             query = query.options(
-                joinedload(Budget.budget_items).joinedload(BudgetItem.catalog_item),
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.budget_items)
+                .joinedload(BudgetItem.catalog_item),
+                joinedload(Budget.budget_categories)
+                .joinedload(BudgetCategory.category_profit),
                 joinedload(Budget.visit).joinedload(Visit.project),
                 joinedload(Budget.accepted_by)
             )
-        
+
         return query.order_by(Budget.created_at.desc()).offset(skip).limit(limit).all()
 
     def recalculate_total(self, budget_id: UUID) -> Decimal:
-        """Recalculate total amount from budget items."""
+        """Recalculate total amount from budget categories' subtotals."""
         total = self.db.query(
-            func.coalesce(func.sum(BudgetItem.subtotal), 0)
+            func.coalesce(func.sum(BudgetCategory.subtotal), 0)
         ).filter(
-            BudgetItem.budget_id == budget_id
+            BudgetCategory.budget_id == budget_id
         ).scalar()
 
         return Decimal(str(total)) if total else Decimal('0')
@@ -125,13 +132,13 @@ class BudgetItemRepository(BaseRepository[BudgetItem]):
     def __init__(self, db: Session):
         super().__init__(BudgetItem, db)
 
-    def get_by_budget(
+    def get_by_category(
         self,
-        budget_id: UUID,
+        category_id: UUID,
         include_catalog: bool = True
     ) -> List[BudgetItem]:
-        """Get all items for a specific budget."""
-        query = self.db.query(BudgetItem).filter(BudgetItem.budget_id == budget_id)
+        """Get all items for a specific category."""
+        query = self.db.query(BudgetItem).filter(BudgetItem.budget_category_id == category_id)
 
         if include_catalog:
             query = query.options(joinedload(BudgetItem.catalog_item))
@@ -147,8 +154,8 @@ class BudgetItemRepository(BaseRepository[BudgetItem]):
             .first()
         )
 
-    def delete_by_budget(self, budget_id: UUID) -> int:
-        """Delete all items for a budget (returns count deleted)."""
-        count = self.db.query(BudgetItem).filter(BudgetItem.budget_id == budget_id).delete()
+    def delete_by_category(self, category_id: UUID) -> int:
+        """Delete all items for a category (returns count deleted)."""
+        count = self.db.query(BudgetItem).filter(BudgetItem.budget_category_id == category_id).delete()
         self.db.flush()
         return count

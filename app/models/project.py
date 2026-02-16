@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Text, Enum, Numeric, Date
+from sqlalchemy import Column, String, ForeignKey, Text, Enum, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -35,14 +35,8 @@ class Project(BaseModel):
         index=True
     )
 
-    # Financial information
-    estimated_budget = Column(Numeric(12, 2), nullable=True)
-    actual_cost = Column(Numeric(12, 2), nullable=True)
-
     # Dates
     start_date = Column(Date, nullable=True)
-    estimated_completion_date = Column(Date, nullable=True)
-    actual_completion_date = Column(Date, nullable=True)
 
     # Location
     address = Column(String(500), nullable=True)
@@ -76,6 +70,7 @@ class Project(BaseModel):
     category = relationship("ProjectCategory", back_populates="projects")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     visits = relationship("Visit", back_populates="project", cascade="all, delete-orphan")
+    attachments = relationship("ProjectAttachment", back_populates="project", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', status={self.status}, client_id={self.client_id})>"

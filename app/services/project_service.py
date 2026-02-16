@@ -121,11 +121,7 @@ class ProjectService:
             name=project_data.name,
             description=project_data.description,
             status=project_data.status,
-            estimated_budget=project_data.estimated_budget,
-            actual_cost=project_data.actual_cost,
             start_date=project_data.start_date,
-            estimated_completion_date=project_data.estimated_completion_date,
-            actual_completion_date=project_data.actual_completion_date,
             address=project_data.address,
             client_id=project_data.client_id,
             category_id=project_data.category_id,
@@ -153,7 +149,7 @@ class ProjectService:
                         "Client": client.name,
                         "Category": category.name,
                         "Status": project.status.value,
-                        "Estimated Budget": f"${project.estimated_budget:,.2f}" if project.estimated_budget else "N/A"
+                        "Address": project.address if project.address else "N/A"
                     }
                 ),
                 daemon=True

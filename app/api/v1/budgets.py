@@ -1,11 +1,8 @@
 """
-Budget endpoints with dependency injection, clean architecture, and N+1 optimization.
+Budget endpoints with categories, items, and versioning.
 
-Provides complete CRUD operations for budgets including:
-- Creating budgets for visits
-- Managing budget items (from catalog or custom)
-- Accepting/rejecting budgets (triggers project status update)
-- Retrieving budgets with filtering
+Structure: Budget → Categories → Items
+Provides complete CRUD for budgets, categories, items, and version history.
 """
 
 from fastapi import APIRouter, Depends, status, Query
@@ -17,47 +14,40 @@ from app.services import BudgetService
 from app.schemas.budget import (
     BudgetCreate,
     BudgetUpdate,
-    BudgetResponse,
     BudgetDetailResponse,
+    BudgetCategoryCreate,
+    BudgetCategoryDetailResponse,
     BudgetItemCreate,
     BudgetItemUpdate,
-    BudgetItemResponse,
     BudgetItemDetailResponse,
     BudgetAcceptRequest
+)
+from app.schemas.budget_category import BudgetCategoryUpdate
+from app.schemas.budget_version import BudgetVersionResponse, BudgetVersionListResponse
+from app.schemas.category_profit import (
+    CategoryProfitCreate,
+    CategoryProfitUpdate,
+    CategoryProfitResponse,
 )
 from app.models.budget import BudgetStatus
 
 router = APIRouter(prefix="/budgets", tags=["Budgets"])
 
 
+# --- Budget CRUD ---
+
 @router.post("/", response_model=BudgetDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_budget(
     budget: BudgetCreate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
-    created_by_user_id: Optional[UUID] = Query(None, description="User ID who is creating this budget (for audit trail)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID who is creating this budget"),
     service: BudgetService = Depends(get_budget_service)
 ):
     """
-    Create a new budget for a visit.
+    Create a new budget for a visit with categories and items.
 
-    A budget contains line items (products/services) that can be:
-    - Selected from catalog (reusable products/services)
-    - Custom items (project-specific work)
-
-    Business rules enforced:
-    - Visit must exist and belong to the company
-    - Visit must not already have a budget (one-to-one relationship)
-    - Catalog items (if referenced) must exist and belong to the company
-    - Total amount is automatically calculated from items
-
-    **Budget Items:**
-    - Can reference catalog items (optional catalog_item_id)
-    - Store actual price used (may differ from catalog base price)
-    - Support sections (e.g., "PROVISIONALS", "DEMO", "ELECTRICAL")
-    - Automatically calculate subtotal (quantity * unit_price)
-
-    **Audit Trail:**
-    - Tracks which user created the budget via created_by_user_id
+    Structure: Budget → Categories → Items
+    Each category can contain multiple items and up to 3 images.
     """
     budget_obj = service.create_budget(budget, company_id, created_by_user_id)
     return BudgetDetailResponse.from_orm_with_details(budget_obj)
@@ -72,21 +62,7 @@ def list_budgets(
     limit: int = Query(100, ge=1, le=1000),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Get all budgets with optional filters.
-
-    **IMPORTANT for CRM:**
-    - company_id is REQUIRED for multi-tenant isolation
-    - Can filter by visit, status, or both
-    - Budget items and catalog references are eagerly loaded (N+1 query optimization)
-
-    **Available Statuses:**
-    - draft: Budget being created/edited
-    - pending_approval: Budget submitted for client approval
-    - accepted: Budget accepted by client
-    - rejected: Budget rejected by client
-    - revised: Budget revised after rejection
-    """
+    """Get all budgets with optional filters."""
     budgets = service.get_budgets(
         company_id=company_id,
         visit_id=visit_id,
@@ -94,7 +70,6 @@ def list_budgets(
         skip=skip,
         limit=limit
     )
-    
     return [BudgetDetailResponse.from_orm_with_details(budget) for budget in budgets]
 
 
@@ -104,11 +79,7 @@ def get_budget(
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Get a specific budget by ID.
-
-    Includes all budget items with catalog item references for full details.
-    """
+    """Get a specific budget by ID with all categories and items."""
     budget = service.get_budget(budget_id, company_id)
     return BudgetDetailResponse.from_orm_with_details(budget)
 
@@ -119,11 +90,7 @@ def get_budget_by_visit(
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Get budget for a specific visit.
-
-    Returns the budget associated with the visit, if it exists.
-    """
+    """Get budget for a specific visit."""
     budget = service.get_budget_by_visit(visit_id, company_id)
     if not budget:
         from fastapi import HTTPException
@@ -139,74 +106,221 @@ def update_budget(
     budget_id: UUID,
     budget_update: BudgetUpdate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the update"),
     service: BudgetService = Depends(get_budget_service)
 ):
     """
-    Update a budget.
+    Update a budget (title, description, status).
 
-    Can update:
-    - Title and description
-    - Status (workflow management)
-    - Total amount (usually recalculated automatically)
-
-    **Note:** To update budget items, use the item-specific endpoints.
+    A version snapshot is automatically saved before modifying non-draft budgets.
     """
-    budget = service.update_budget(budget_id, budget_update, company_id)
+    budget = service.update_budget(budget_id, budget_update, company_id, created_by_user_id)
     return BudgetDetailResponse.from_orm_with_details(budget)
 
 
-@router.post("/{budget_id}/items", response_model=BudgetItemDetailResponse, status_code=status.HTTP_201_CREATED)
-def add_budget_item(
+# --- Category CRUD ---
+
+@router.post("/{budget_id}/categories", response_model=BudgetCategoryDetailResponse, status_code=status.HTTP_201_CREATED)
+def add_category(
     budget_id: UUID,
-    item: BudgetItemCreate,
+    category: BudgetCategoryCreate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
     service: BudgetService = Depends(get_budget_service)
 ):
     """
-    Add an item to a budget.
+    Add a category to a budget with optional items.
 
-    Items can be:
-    - **From catalog**: Provide catalog_item_id, name/unit/price auto-filled (can be customized)
-    - **Custom**: Provide description, unit, quantity, unit_price manually
-
-    Budget total is automatically recalculated after adding the item.
+    Each category can have up to 3 images and multiple items.
     """
-    item_obj = service.add_budget_item(budget_id, item, company_id)
+    cat_obj = service.add_category(budget_id, category, company_id, created_by_user_id)
+    return BudgetCategoryDetailResponse.from_orm_with_details(cat_obj)
+
+
+@router.put("/{budget_id}/categories/{category_id}", response_model=BudgetCategoryDetailResponse)
+def update_category(
+    budget_id: UUID,
+    category_id: UUID,
+    category_update: BudgetCategoryUpdate,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Update a budget category (name, description, images)."""
+    cat_obj = service.update_category(budget_id, category_id, category_update, company_id, created_by_user_id)
+    return BudgetCategoryDetailResponse.from_orm_with_details(cat_obj)
+
+
+@router.delete("/{budget_id}/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    budget_id: UUID,
+    category_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Delete a budget category and all its items."""
+    service.delete_category(budget_id, category_id, company_id, created_by_user_id)
+    return None
+
+
+# --- Item CRUD (within categories) ---
+
+@router.post(
+    "/{budget_id}/categories/{category_id}/items",
+    response_model=BudgetItemDetailResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def add_item_to_category(
+    budget_id: UUID,
+    category_id: UUID,
+    item: BudgetItemCreate,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Add an item to a budget category. Subtotal is auto-calculated."""
+    item_obj = service.add_item_to_category(budget_id, category_id, item, company_id, created_by_user_id)
     return BudgetItemDetailResponse.from_orm_with_details(item_obj)
 
 
-@router.put("/{budget_id}/items/{item_id}", response_model=BudgetItemDetailResponse)
-def update_budget_item(
+@router.put(
+    "/{budget_id}/categories/{category_id}/items/{item_id}",
+    response_model=BudgetItemDetailResponse
+)
+def update_item(
     budget_id: UUID,
+    category_id: UUID,
     item_id: UUID,
     item_update: BudgetItemUpdate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Update a budget item. Subtotal is recalculated if quantity or unit_price changes."""
+    item_obj = service.update_budget_item(budget_id, category_id, item_id, item_update, company_id, created_by_user_id)
+    return BudgetItemDetailResponse.from_orm_with_details(item_obj)
+
+
+@router.delete(
+    "/{budget_id}/categories/{category_id}/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_item(
+    budget_id: UUID,
+    category_id: UUID,
+    item_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Delete a budget item from a category."""
+    service.delete_budget_item(budget_id, category_id, item_id, company_id, created_by_user_id)
+    return None
+
+
+# --- Category Profit (internal cost breakdown) ---
+
+@router.put(
+    "/{budget_id}/categories/{category_id}/profit",
+    response_model=CategoryProfitResponse,
+    status_code=status.HTTP_200_OK
+)
+def set_category_profit(
+    budget_id: UUID,
+    category_id: UUID,
+    profit_data: CategoryProfitCreate,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
     service: BudgetService = Depends(get_budget_service)
 ):
     """
-    Update a budget item.
+    Set profit breakdown for a budget category (create or replace).
 
-    Budget total is automatically recalculated after updating the item.
+    Calculates total_price as: (provider_price + delivery_cost) * (1 + profit_percentage/100).
+    Updates the category subtotal and budget total automatically.
     """
-    item = service.update_budget_item(budget_id, item_id, item_update, company_id)
-    return BudgetItemDetailResponse.from_orm_with_details(item)
+    profit = service.set_category_profit(
+        budget_id, category_id, profit_data, company_id, created_by_user_id
+    )
+    return CategoryProfitResponse.from_orm_with_details(profit)
 
 
-@router.delete("/{budget_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_budget_item(
+@router.get(
+    "/{budget_id}/categories/{category_id}/profit",
+    response_model=CategoryProfitResponse
+)
+def get_category_profit(
     budget_id: UUID,
-    item_id: UUID,
+    category_id: UUID,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Delete a budget item.
+    """Get profit breakdown for a budget category."""
+    profit = service.get_category_profit(budget_id, category_id, company_id)
+    if not profit:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No profit data found for category {category_id}"
+        )
+    return CategoryProfitResponse.from_orm_with_details(profit)
 
-    Budget total is automatically recalculated after deleting the item.
+
+@router.patch(
+    "/{budget_id}/categories/{category_id}/profit",
+    response_model=CategoryProfitResponse
+)
+def update_category_profit(
+    budget_id: UUID,
+    category_id: UUID,
+    profit_data: CategoryProfitUpdate,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
     """
-    service.delete_budget_item(budget_id, item_id, company_id)
+    Partially update profit data for a budget category.
+
+    Recalculates total_price and updates budget totals automatically.
+    """
+    profit = service.update_category_profit(
+        budget_id, category_id, profit_data, company_id, created_by_user_id
+    )
+    return CategoryProfitResponse.from_orm_with_details(profit)
+
+
+@router.delete(
+    "/{budget_id}/categories/{category_id}/profit",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_category_profit(
+    budget_id: UUID,
+    category_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User ID making the change"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Delete profit data for a budget category. Resets subtotal to sum of items."""
+    service.delete_category_profit(budget_id, category_id, company_id, created_by_user_id)
     return None
 
+
+@router.get(
+    "/{budget_id}/profits",
+    response_model=List[CategoryProfitResponse]
+)
+def list_budget_profits(
+    budget_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Get all profit data for all categories in a budget."""
+    profits = service.get_all_profits_for_budget(budget_id, company_id)
+    return [CategoryProfitResponse.from_orm_with_details(p) for p in profits]
+
+
+# --- Budget Workflow ---
 
 @router.post("/{budget_id}/accept", response_model=BudgetDetailResponse)
 def accept_budget(
@@ -216,21 +330,10 @@ def accept_budget(
     service: BudgetService = Depends(get_budget_service)
 ):
     """
-    Accept a budget and update project status.
+    Accept a budget and update project status to APPROVED.
 
-    **Critical Workflow:**
-    - Budget status changes to ACCEPTED
-    - Project status automatically changes to APPROVED
-    - Tracks who accepted and when
-
-    **Business Rules:**
-    - Budget must be in PENDING_APPROVAL status
-    - User must exist and belong to the company
-    - This action triggers the project to move forward
-
-    **Returns:**
-    - Updated budget with ACCEPTED status
-    - Project status is updated to APPROVED
+    A version snapshot is saved before acceptance.
+    Budget must be in PENDING_APPROVAL status.
     """
     budget, project = service.accept_budget(
         budget_id,
@@ -246,14 +349,7 @@ def reject_budget(
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Reject a budget.
-
-    **Business Rules:**
-    - Budget must be in PENDING_APPROVAL status
-    - Budget status changes to REJECTED
-    - Project status remains unchanged
-    """
+    """Reject a budget. Must be in PENDING_APPROVAL status."""
     budget = service.reject_budget(budget_id, company_id)
     return BudgetDetailResponse.from_orm_with_details(budget)
 
@@ -264,10 +360,38 @@ def recalculate_budget(
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     service: BudgetService = Depends(get_budget_service)
 ):
-    """
-    Recalculate budget total from all items.
-
-    Useful if items were modified outside the normal flow or for data integrity checks.
-    """
+    """Recalculate budget total from all categories and items."""
     budget = service.recalculate_budget_total(budget_id, company_id)
     return BudgetDetailResponse.from_orm_with_details(budget)
+
+
+# --- Version History ---
+
+@router.get("/{budget_id}/versions", response_model=BudgetVersionListResponse)
+def list_versions(
+    budget_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Get all version snapshots for a budget (most recent first)."""
+    versions = service.get_versions(budget_id, company_id, skip=skip, limit=limit)
+    return BudgetVersionListResponse(
+        versions=[BudgetVersionResponse.from_orm_with_details(v) for v in versions],
+        total=len(versions),
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/{budget_id}/versions/{version_id}", response_model=BudgetVersionResponse)
+def get_version(
+    budget_id: UUID,
+    version_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Get a specific version snapshot with full budget data."""
+    version = service.get_version(budget_id, version_id, company_id)
+    return BudgetVersionResponse.from_orm_with_details(version)

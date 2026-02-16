@@ -520,20 +520,23 @@ class RenderingService:
         if budget.visit.project.client.company_id != company_id:
             raise ValidationException("Budget does not belong to your company")
 
-        # Get budget items
-        budget_items = self.budget_item_repository.get_by_budget(budget_id)
+        # Get budget items from all categories
+        budget_items = []
+        for cat in budget.budget_categories:
+            for bi in cat.budget_items:
+                budget_items.append((cat.name, bi))
 
         if item_ids:
-            budget_items = [bi for bi in budget_items if bi.id in item_ids]
+            budget_items = [(cat_name, bi) for cat_name, bi in budget_items if bi.id in item_ids]
 
         # Get current max order
         max_order = self.rendering_item_repository.get_max_order_index(rendering_id)
 
         created_items = []
-        for idx, bi in enumerate(budget_items):
+        for idx, (cat_name, bi) in enumerate(budget_items):
             item = self.rendering_item_repository.create(
                 rendering_id=rendering_id,
-                category=bi.section_name,
+                category=cat_name,
                 name=bi.description,
                 specifications=None,
                 notes=None,

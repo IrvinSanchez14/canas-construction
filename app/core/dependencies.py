@@ -27,6 +27,9 @@ from app.repositories import (
     VisitRepository,
     BudgetRepository,
     BudgetItemRepository,
+    BudgetCategoryRepository,
+    BudgetVersionRepository,
+    CategoryProfitRepository,
     RenderingRepository,
     RenderingImageRepository,
     RenderingItemRepository
@@ -273,6 +276,21 @@ def get_budget_item_repository(db: Session = Depends(get_db)) -> BudgetItemRepos
     return BudgetItemRepository(db)
 
 
+def get_budget_category_repository(db: Session = Depends(get_db)) -> BudgetCategoryRepository:
+    """Get BudgetCategory repository instance."""
+    return BudgetCategoryRepository(db)
+
+
+def get_budget_version_repository(db: Session = Depends(get_db)) -> BudgetVersionRepository:
+    """Get BudgetVersion repository instance."""
+    return BudgetVersionRepository(db)
+
+
+def get_category_profit_repository(db: Session = Depends(get_db)) -> CategoryProfitRepository:
+    """Get CategoryProfit repository instance."""
+    return CategoryProfitRepository(db)
+
+
 def get_budget_service(db: Session = Depends(get_db)) -> BudgetService:
     """
     Get BudgetService with all dependencies injected.
@@ -285,18 +303,24 @@ def get_budget_service(db: Session = Depends(get_db)) -> BudgetService:
     """
     budget_repo = get_budget_repository(db)
     budget_item_repo = get_budget_item_repository(db)
+    budget_category_repo = get_budget_category_repository(db)
+    budget_version_repo = get_budget_version_repository(db)
     visit_repo = get_visit_repository(db)
     project_repo = get_project_repository(db)
     user_repo = get_user_repository(db)
     catalog_item_repo = get_catalog_item_repository(db)
+    category_profit_repo = get_category_profit_repository(db)
 
     return BudgetService(
         budget_repository=budget_repo,
         budget_item_repository=budget_item_repo,
+        budget_category_repository=budget_category_repo,
+        budget_version_repository=budget_version_repo,
         visit_repository=visit_repo,
         project_repository=project_repo,
         user_repository=user_repo,
-        catalog_item_repository=catalog_item_repo
+        catalog_item_repository=catalog_item_repo,
+        category_profit_repository=category_profit_repo
     )
 
 

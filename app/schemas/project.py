@@ -2,7 +2,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, date
 from typing import Optional
 from uuid import UUID
-from decimal import Decimal
 from app.models.project import ProjectStatus
 from app.schemas.client import ClientResponse
 from app.schemas.project_category import ProjectCategoryResponse
@@ -13,11 +12,7 @@ class ProjectBase(BaseModel):
     name: str
     description: Optional[str] = None
     status: ProjectStatus = ProjectStatus.LEAD
-    estimated_budget: Optional[Decimal] = Field(None, decimal_places=2)
-    actual_cost: Optional[Decimal] = Field(None, decimal_places=2)
     start_date: Optional[date] = None
-    estimated_completion_date: Optional[date] = None
-    actual_completion_date: Optional[date] = None
     address: Optional[str] = None
 
 
@@ -38,11 +33,7 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     status: Optional[ProjectStatus] = None
-    estimated_budget: Optional[Decimal] = Field(None, decimal_places=2)
-    actual_cost: Optional[Decimal] = Field(None, decimal_places=2)
     start_date: Optional[date] = None
-    estimated_completion_date: Optional[date] = None
-    actual_completion_date: Optional[date] = None
     address: Optional[str] = None
     category_id: Optional[UUID] = None
 

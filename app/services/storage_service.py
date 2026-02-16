@@ -26,6 +26,8 @@ class StorageService:
     """
 
     ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+    ALLOWED_DOCUMENT_TYPES = {'application/pdf'}
+    ALLOWED_FILE_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_DOCUMENT_TYPES  # Combined set
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
     def __init__(self):
@@ -88,12 +90,29 @@ class StorageService:
 
         return True, ""
 
+    def validate_file(self, content_type: str, file_size: int) -> tuple[bool, str]:
+        """
+        Validate any file (image or document).
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if content_type not in self.ALLOWED_FILE_TYPES:
+            return False, f"Invalid file type: {content_type}. Allowed: JPEG, PNG, WebP, GIF, PDF"
+
+        if file_size > self.MAX_FILE_SIZE:
+            max_mb = self.MAX_FILE_SIZE / (1024 * 1024)
+            return False, f"File too large. Maximum size: {max_mb}MB"
+
+        return True, ""
+
     async def upload_file(
         self,
         file_content: bytes,
         filename: str,
         content_type: str,
-        folder: str = "renderings"
+        folder: str = "renderings",
+        validate_images_only: bool = False
     ) -> Optional[str]:
         """
         Upload a file to R2.
@@ -103,6 +122,7 @@ class StorageService:
             filename: Original filename
             content_type: MIME type
             folder: Folder prefix in bucket
+            validate_images_only: If True, only validate images; if False, validate all file types
 
         Returns:
             Public URL of uploaded file, or None if failed
@@ -111,7 +131,11 @@ class StorageService:
             raise ValueError("R2 storage not configured")
 
         # Validate
-        is_valid, error = self.validate_image(content_type, len(file_content))
+        if validate_images_only:
+            is_valid, error = self.validate_image(content_type, len(file_content))
+        else:
+            is_valid, error = self.validate_file(content_type, len(file_content))
+            
         if not is_valid:
             raise ValueError(error)
 

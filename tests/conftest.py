@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models.base import Base
 from app.models import *  # noqa
+from app.models.notification import NotificationSettings, NotificationRecipient  # noqa - needed for mapper initialization
 
 
 @pytest.fixture(scope="function")
