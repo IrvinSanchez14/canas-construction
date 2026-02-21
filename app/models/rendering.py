@@ -42,6 +42,9 @@ class Rendering(BaseModel):
     # Financial (calculated from items)
     total_amount = Column(Numeric(12, 2), nullable=False, default=0)
 
+    # Version tracking
+    current_version = Column(Integer, nullable=False, default=0)
+
     # Foreign key to visit (optional, can exist without visit)
     visit_id = Column(
         UUID(as_uuid=True),
@@ -80,6 +83,12 @@ class Rendering(BaseModel):
         back_populates="rendering",
         cascade="all, delete-orphan",
         order_by="RenderingItem.order_index"
+    )
+    versions = relationship(
+        "RenderingVersion",
+        back_populates="rendering",
+        cascade="all, delete-orphan",
+        order_by="RenderingVersion.version_number.desc()"
     )
 
     def __repr__(self):
@@ -144,13 +153,22 @@ class RenderingItem(BaseModel):
 
     # Image for this item (optional)
     image_url = Column(String(500), nullable=True)
+    material_image_url = Column(String(500), nullable=True)
+    product_image_url = Column(String(500), nullable=True)
 
     # Pricing
     quantity = Column(Numeric(10, 2), nullable=False, default=1)
     unit = Column(String(50), nullable=True)
     unit_price = Column(Numeric(12, 2), nullable=False, default=0)
     subtotal = Column(Numeric(12, 2), nullable=False, default=0)
+    tax = Column(Numeric(12, 2), nullable=True)
     total = Column(Numeric(12, 2), nullable=False, default=0)
+    disclaimer = Column(Text, nullable=True)
+
+    # Display settings
+    is_material_sample = Column(Boolean, nullable=False, default=False)
+    show_in_materials_page = Column(Boolean, nullable=False, default=False)
+    show_in_details_page = Column(Boolean, nullable=False, default=True)
 
     # Ordering
     order_index = Column(Integer, nullable=False, default=0)

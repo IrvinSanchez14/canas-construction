@@ -16,6 +16,7 @@ from app.repositories.rendering_repository import (
     RenderingImageRepository,
     RenderingItemRepository
 )
+from app.repositories.rendering_version_repository import RenderingVersionRepository
 
 __all__ = [
     "BaseRepository",
@@ -35,4 +36,5 @@ __all__ = [
     "RenderingRepository",
     "RenderingImageRepository",
     "RenderingItemRepository",
+    "RenderingVersionRepository",
 ]

@@ -71,7 +71,7 @@ class BudgetItemDetailResponse(BudgetItemResponse):
     def from_orm_with_details(cls, item):
         """Create response with catalog item name."""
         data = {
-            **item.__dict__,
+            **{k: v for k, v in item.__dict__.items() if not k.startswith('_')},
             "catalog_item_name": item.catalog_item.name if item.catalog_item else None,
         }
         return cls(**data)
@@ -116,7 +116,7 @@ class BudgetCategoryDetailResponse(BaseModel):
     @classmethod
     def from_orm_with_details(cls, category):
         data = {
-            **category.__dict__,
+            **{k: v for k, v in category.__dict__.items() if not k.startswith('_')},
             "budget_items": [
                 BudgetItemDetailResponse.from_orm_with_details(item)
                 for item in category.budget_items
@@ -174,19 +174,33 @@ class BudgetDetailResponse(BudgetResponse):
     """Schema for detailed budget response with categories and items."""
     budget_categories: List[BudgetCategoryDetailResponse] = Field(default_factory=list)
     accepted_by_name: Optional[str] = Field(None, description="Name of user who accepted the budget")
+    visit_title: Optional[str] = Field(None)
+    project_name: Optional[str] = Field(None)
+    project_address: Optional[str] = Field(None)
+    client_name: Optional[str] = Field(None)
+    client_phone: Optional[str] = Field(None)
+    client_email: Optional[str] = Field(None)
 
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_orm_with_details(cls, budget):
         """Create response with categories, items, and accepted_by name."""
+        project = budget.visit.project if budget.visit else None
+        client = project.client if project else None
         data = {
-            **budget.__dict__,
+            **{k: v for k, v in budget.__dict__.items() if not k.startswith('_')},
             "budget_categories": [
                 BudgetCategoryDetailResponse.from_orm_with_details(cat)
                 for cat in budget.budget_categories
             ],
             "accepted_by_name": budget.accepted_by.full_name if budget.accepted_by else None,
+            "visit_title": budget.visit.title if budget.visit else None,
+            "project_name": project.name if project else None,
+            "project_address": project.address if project else None,
+            "client_name": client.name if client else None,
+            "client_phone": client.phone if client else None,
+            "client_email": client.email if client else None,
         }
         return cls(**data)
 

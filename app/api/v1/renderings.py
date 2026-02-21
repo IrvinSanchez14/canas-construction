@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from uuid import UUID
 from io import BytesIO
+from datetime import datetime
 
 from app.core.dependencies import get_rendering_service
 from app.services.rendering_service import RenderingService
@@ -33,6 +34,7 @@ from app.schemas.rendering import (
     ImportBudgetItemsRequest,
     SendRenderingRequest
 )
+from app.schemas.rendering_version import RenderingVersionResponse, RenderingVersionListResponse
 from app.models.rendering import RenderingStatus
 
 router = APIRouter(prefix="/renderings", tags=["Renderings"])
@@ -330,23 +332,81 @@ def generate_rendering_pdf(
     """
     Generate a PDF for the rendering.
 
-    The PDF includes:
-    - Cover page with project information
-    - Full-page 3D rendered images
-    - Material samples grid
-    - Item details with specifications and pricing
-    - Total amount
+    The PDF includes branded header on every page with one 3D render image per page.
+    Filename format: {client_name}_{project}_{datetimestamp}.pdf
     """
     rendering = service.get_rendering(rendering_id, company_id)
 
     # Generate PDF
     pdf_bytes = pdf_service.generate_pdf(rendering)
 
-    # Return as downloadable PDF
+    # Build filename: {client_name}_{project}_{datetimestamp}.pdf
+    client_name = ""
+    project_name = ""
+    if rendering.visit and rendering.visit.project:
+        project_name = rendering.visit.project.name or ""
+        if rendering.visit.project.client:
+            client_name = rendering.visit.project.client.name or ""
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    parts = [p.replace(' ', '_') for p in [client_name, project_name] if p]
+    parts.append(timestamp)
+    filename = "_".join(parts) + ".pdf"
+
     return StreamingResponse(
         BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename=rendering_{rendering.title.replace(' ', '_')}.pdf"
+            "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+# ============== Save & Version History ==============
+
+@router.post("/{rendering_id}/save", response_model=RenderingVersionResponse)
+def save_rendering(
+    rendering_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    created_by_user_id: Optional[UUID] = Query(None, description="User who saved"),
+    notes: Optional[str] = Query(None, description="Optional notes for this save"),
+    service: RenderingService = Depends(get_rendering_service)
+):
+    """
+    Explicitly save a rendering by creating a version snapshot.
+
+    This captures the full current state of the rendering (images, items, settings)
+    as a version snapshot that can be reviewed later.
+    """
+    version = service.save_rendering(rendering_id, company_id, created_by_user_id, notes)
+    return RenderingVersionResponse.from_orm_with_details(version)
+
+
+@router.get("/{rendering_id}/versions", response_model=RenderingVersionListResponse)
+def list_rendering_versions(
+    rendering_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    service: RenderingService = Depends(get_rendering_service)
+):
+    """Get all version snapshots for a rendering (most recent first)."""
+    versions = service.get_versions(rendering_id, company_id, skip=skip, limit=limit)
+    return RenderingVersionListResponse(
+        versions=[RenderingVersionResponse.from_orm_with_details(v) for v in versions],
+        total=len(versions),
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/{rendering_id}/versions/{version_id}", response_model=RenderingVersionResponse)
+def get_rendering_version(
+    rendering_id: UUID,
+    version_id: UUID,
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    service: RenderingService = Depends(get_rendering_service)
+):
+    """Get a specific version snapshot with full rendering data."""
+    version = service.get_version(rendering_id, version_id, company_id)
+    return RenderingVersionResponse.from_orm_with_details(version)

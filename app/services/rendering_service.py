@@ -16,11 +16,13 @@ from datetime import datetime
 
 from app.models import Rendering, RenderingStatus
 from app.models.rendering import RenderingImage, RenderingItem
+from app.models.rendering_version import RenderingVersion
 from app.repositories.rendering_repository import (
     RenderingRepository,
     RenderingImageRepository,
     RenderingItemRepository
 )
+from app.repositories.rendering_version_repository import RenderingVersionRepository
 from app.repositories import VisitRepository, BudgetRepository, BudgetItemRepository
 from app.schemas.rendering import (
     RenderingCreate,
@@ -54,6 +56,7 @@ class RenderingService:
         rendering_repository: RenderingRepository,
         rendering_image_repository: RenderingImageRepository,
         rendering_item_repository: RenderingItemRepository,
+        rendering_version_repository: RenderingVersionRepository,
         visit_repository: VisitRepository,
         budget_repository: BudgetRepository,
         budget_item_repository: BudgetItemRepository
@@ -62,9 +65,126 @@ class RenderingService:
         self.rendering_repository = rendering_repository
         self.rendering_image_repository = rendering_image_repository
         self.rendering_item_repository = rendering_item_repository
+        self.rendering_version_repository = rendering_version_repository
         self.visit_repository = visit_repository
         self.budget_repository = budget_repository
         self.budget_item_repository = budget_item_repository
+
+    # ============== Version Management (internal) ==============
+
+    def _build_snapshot(self, rendering: Rendering) -> dict:
+        """Build a JSON snapshot of the current rendering state."""
+        images_snapshot = []
+        for img in sorted(rendering.images, key=lambda x: x.display_order):
+            images_snapshot.append({
+                "id": str(img.id),
+                "image_url": img.image_url,
+                "title": img.title,
+                "description": img.description,
+                "display_order": img.display_order,
+                "is_full_page": img.is_full_page,
+                "image_type": img.image_type,
+            })
+
+        items_snapshot = []
+        for item in sorted(rendering.items, key=lambda x: x.order_index):
+            items_snapshot.append({
+                "id": str(item.id),
+                "category": item.category,
+                "name": item.name,
+                "specifications": item.specifications,
+                "notes": item.notes,
+                "image_url": item.image_url,
+                "material_image_url": item.material_image_url,
+                "product_image_url": item.product_image_url,
+                "quantity": str(item.quantity),
+                "unit": item.unit,
+                "unit_price": str(item.unit_price),
+                "subtotal": str(item.subtotal),
+                "tax": str(item.tax) if item.tax else None,
+                "total": str(item.total),
+                "disclaimer": item.disclaimer,
+                "is_material_sample": item.is_material_sample,
+                "show_in_materials_page": item.show_in_materials_page,
+                "show_in_details_page": item.show_in_details_page,
+                "order_index": item.order_index,
+            })
+
+        return {
+            "title": rendering.title,
+            "description": rendering.description,
+            "notes": rendering.notes,
+            "status": rendering.status.value,
+            "total_amount": str(rendering.total_amount),
+            "expiration_date": str(rendering.expiration_date) if rendering.expiration_date else None,
+            "images": images_snapshot,
+            "items": items_snapshot,
+        }
+
+    def _create_version_snapshot(
+        self,
+        rendering: Rendering,
+        created_by_user_id: Optional[UUID] = None,
+        notes: Optional[str] = None
+    ) -> RenderingVersion:
+        """Create a version snapshot of the current rendering state."""
+        next_version = self.rendering_version_repository.get_latest_version_number(rendering.id) + 1
+        snapshot = self._build_snapshot(rendering)
+
+        version = self.rendering_version_repository.create(
+            rendering_id=rendering.id,
+            version_number=next_version,
+            snapshot=snapshot,
+            notes=notes,
+            created_by_user_id=created_by_user_id
+        )
+
+        rendering.current_version = next_version
+        self.rendering_repository.db.flush()
+
+        logger.info(f"Created version {next_version} for rendering {rendering.id}")
+        return version
+
+    # ============== Public Version Methods ==============
+
+    def save_rendering(
+        self,
+        rendering_id: UUID,
+        company_id: UUID,
+        created_by_user_id: Optional[UUID] = None,
+        notes: Optional[str] = None
+    ) -> RenderingVersion:
+        """Explicitly save a rendering by creating a version snapshot."""
+        rendering = self.get_rendering(rendering_id, company_id)
+        return self._create_version_snapshot(rendering, created_by_user_id, notes or "Manual save")
+
+    def get_versions(
+        self,
+        rendering_id: UUID,
+        company_id: UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[RenderingVersion]:
+        """Get all version snapshots for a rendering."""
+        self.get_rendering(rendering_id, company_id)
+        return self.rendering_version_repository.get_by_rendering(
+            rendering_id=rendering_id,
+            skip=skip,
+            limit=limit
+        )
+
+    def get_version(
+        self,
+        rendering_id: UUID,
+        version_id: UUID,
+        company_id: UUID
+    ) -> RenderingVersion:
+        """Get a specific version snapshot."""
+        self.get_rendering(rendering_id, company_id)
+        version = self.rendering_version_repository.get_by_id_with_details(version_id)
+        if not version or version.rendering_id != rendering_id:
+            raise NotFoundException(f"Version with ID {version_id} not found for rendering {rendering_id}")
+        return version
 
     # ============== Rendering CRUD ==============
 
@@ -222,6 +342,10 @@ class RenderingService:
         """
         rendering = self.get_rendering(rendering_id, company_id)
 
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before update")
+
         # Validate new visit if provided
         if rendering_data.visit_id and rendering_data.visit_id != rendering.visit_id:
             visit = self.visit_repository.get_by_id_with_details(rendering_data.visit_id)
@@ -288,6 +412,9 @@ class RenderingService:
         """
         rendering = self.get_rendering(rendering_id, company_id)
 
+        # Create version snapshot before status change
+        self._create_version_snapshot(rendering, notes=f"Snapshot before status change to {new_status.value}")
+
         rendering.status = new_status
 
         if new_status == RenderingStatus.SENT:
@@ -316,6 +443,10 @@ class RenderingService:
     ) -> RenderingImage:
         """Add an image to a rendering."""
         rendering = self.get_rendering(rendering_id, company_id)
+
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before adding image")
 
         # Auto-set display order if not provided
         if image_data.display_order == 0:
@@ -361,7 +492,11 @@ class RenderingService:
         company_id: UUID
     ) -> bool:
         """Delete an image from a rendering."""
-        self.get_rendering(rendering_id, company_id)
+        rendering = self.get_rendering(rendering_id, company_id)
+
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before deleting image")
 
         image = self.rendering_image_repository.get_by_id(image_id)
         if not image or image.rendering_id != rendering_id:
@@ -415,14 +550,19 @@ class RenderingService:
         """Add an item to a rendering."""
         rendering = self.get_rendering(rendering_id, company_id)
 
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before adding item")
+
         # Auto-set order index if not provided
         if item_data.order_index == 0:
             max_order = self.rendering_item_repository.get_max_order_index(rendering_id)
             item_data.order_index = max_order + 1
 
-        # Calculate subtotal and total
+        # Calculate subtotal and total (including tax if provided)
         subtotal = item_data.quantity * item_data.unit_price
-        total = subtotal  # Can add tax/discount logic here
+        tax_amount = item_data.tax if item_data.tax else Decimal('0')
+        total = subtotal + tax_amount
 
         item = self.rendering_item_repository.create(
             rendering_id=rendering_id,
@@ -445,7 +585,11 @@ class RenderingService:
         company_id: UUID
     ) -> RenderingItem:
         """Update an item in a rendering."""
-        self.get_rendering(rendering_id, company_id)
+        rendering = self.get_rendering(rendering_id, company_id)
+
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before updating item")
 
         item = self.rendering_item_repository.get_by_id(item_id)
         if not item or item.rendering_id != rendering_id:
@@ -456,8 +600,9 @@ class RenderingService:
         # Recalculate subtotal and total if price fields changed
         quantity = update_dict.get('quantity', item.quantity)
         unit_price = update_dict.get('unit_price', item.unit_price)
+        tax = update_dict.get('tax', item.tax) or Decimal('0')
         update_dict['subtotal'] = quantity * unit_price
-        update_dict['total'] = update_dict['subtotal']
+        update_dict['total'] = update_dict['subtotal'] + tax
 
         for key, value in update_dict.items():
             setattr(item, key, value)
@@ -478,7 +623,11 @@ class RenderingService:
         company_id: UUID
     ) -> bool:
         """Delete an item from a rendering."""
-        self.get_rendering(rendering_id, company_id)
+        rendering = self.get_rendering(rendering_id, company_id)
+
+        # Create version snapshot before modification
+        if rendering.status != RenderingStatus.DRAFT:
+            self._create_version_snapshot(rendering, notes="Auto-saved before deleting item")
 
         item = self.rendering_item_repository.get_by_id(item_id)
         if not item or item.rendering_id != rendering_id:

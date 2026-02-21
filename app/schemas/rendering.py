@@ -52,11 +52,18 @@ class RenderingItemBase(BaseModel):
     specifications: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    material_image_url: Optional[str] = Field(None, max_length=500)
+    product_image_url: Optional[str] = Field(None, max_length=500)
     quantity: Decimal = Field(default=Decimal('1'), ge=0)
     unit: Optional[str] = Field(None, max_length=50)
     unit_price: Decimal = Field(default=Decimal('0'), ge=0)
     subtotal: Decimal = Field(default=Decimal('0'), ge=0)
+    tax: Optional[Decimal] = Field(None, ge=0)
     total: Decimal = Field(default=Decimal('0'), ge=0)
+    disclaimer: Optional[str] = None
+    is_material_sample: bool = False
+    show_in_materials_page: bool = False
+    show_in_details_page: bool = True
     order_index: int = Field(default=0, ge=0)
 
 
@@ -72,11 +79,18 @@ class RenderingItemUpdate(BaseModel):
     specifications: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    material_image_url: Optional[str] = Field(None, max_length=500)
+    product_image_url: Optional[str] = Field(None, max_length=500)
     quantity: Optional[Decimal] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=50)
     unit_price: Optional[Decimal] = Field(None, ge=0)
     subtotal: Optional[Decimal] = Field(None, ge=0)
+    tax: Optional[Decimal] = Field(None, ge=0)
     total: Optional[Decimal] = Field(None, ge=0)
+    disclaimer: Optional[str] = None
+    is_material_sample: Optional[bool] = None
+    show_in_materials_page: Optional[bool] = None
+    show_in_details_page: Optional[bool] = None
     order_index: Optional[int] = Field(None, ge=0)
 
 

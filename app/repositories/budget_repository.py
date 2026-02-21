@@ -35,6 +35,7 @@ class BudgetRepository(BaseRepository[Budget]):
                 .joinedload(BudgetItem.catalog_item),
                 joinedload(Budget.budget_categories)
                 .joinedload(BudgetCategory.category_profit)
+                .joinedload(CategoryProfit.created_by)
             )
 
         return query.filter(Budget.id == budget_id).first()
@@ -49,7 +50,8 @@ class BudgetRepository(BaseRepository[Budget]):
                 .joinedload(BudgetCategory.budget_items)
                 .joinedload(BudgetItem.catalog_item),
                 joinedload(Budget.budget_categories)
-                .joinedload(BudgetCategory.category_profit),
+                .joinedload(BudgetCategory.category_profit)
+                .joinedload(CategoryProfit.created_by),
                 joinedload(Budget.accepted_by)
             )
 
@@ -108,7 +110,8 @@ class BudgetRepository(BaseRepository[Budget]):
                 .joinedload(BudgetCategory.budget_items)
                 .joinedload(BudgetItem.catalog_item),
                 joinedload(Budget.budget_categories)
-                .joinedload(BudgetCategory.category_profit),
+                .joinedload(BudgetCategory.category_profit)
+                .joinedload(CategoryProfit.created_by),
                 joinedload(Budget.visit).joinedload(Visit.project),
                 joinedload(Budget.accepted_by)
             )

@@ -85,6 +85,7 @@ class Visit(BaseModel):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     edited_by = relationship("User", foreign_keys=[edited_by_user_id])
     budget = relationship("Budget", back_populates="visit", uselist=False, cascade="all, delete-orphan")
+    visit_attachments = relationship("VisitAttachment", back_populates="visit", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Visit(id={self.id}, title='{self.title}', status={self.status}, project_id={self.project_id})>"

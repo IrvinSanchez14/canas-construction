@@ -6,9 +6,11 @@ Provides complete CRUD for budgets, categories, items, and version history.
 """
 
 from fastapi import APIRouter, Depends, status, Query
+from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
+from app.core.database import get_db
 from app.core.dependencies import get_budget_service
 from app.services import BudgetService
 from app.schemas.budget import (
@@ -71,6 +73,43 @@ def list_budgets(
         limit=limit
     )
     return [BudgetDetailResponse.from_orm_with_details(budget) for budget in budgets]
+
+
+@router.get("/item-suggestions", response_model=List[str])
+def get_item_suggestions(
+    company_id: UUID = Query(..., description="Company ID (REQUIRED)"),
+    q: str = Query("", description="Search query to filter suggestions"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """
+    Get distinct budget item descriptions for autocomplete suggestions.
+
+    Returns unique descriptions from all budget items belonging to the company,
+    filtered by the search query.
+    """
+    from app.models.budget import Budget, BudgetItem
+    from app.models.budget_category import BudgetCategory
+    from app.models.visit import Visit
+    from app.models.project import Project
+    from app.models.client import Client
+    from sqlalchemy import func
+
+    query = (
+        db.query(func.distinct(BudgetItem.description))
+        .join(BudgetCategory, BudgetItem.budget_category_id == BudgetCategory.id)
+        .join(Budget, BudgetCategory.budget_id == Budget.id)
+        .join(Visit, Budget.visit_id == Visit.id)
+        .join(Project, Visit.project_id == Project.id)
+        .join(Client, Project.client_id == Client.id)
+        .filter(Client.company_id == company_id)
+    )
+
+    if q.strip():
+        query = query.filter(BudgetItem.description.ilike(f"%{q.strip()}%"))
+
+    results = query.order_by(BudgetItem.description).limit(limit).all()
+    return [row[0] for row in results]
 
 
 @router.get("/{budget_id}", response_model=BudgetDetailResponse)

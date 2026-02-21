@@ -8,11 +8,14 @@ from app.models.project import Project, ProjectStatus
 from app.models.project_attachment import ProjectAttachment
 from app.models.catalog_item import CatalogItem, UnitType
 from app.models.visit import Visit, VisitStatus
+from app.models.visit_attachment import VisitAttachment
 from app.models.budget import Budget, BudgetItem, BudgetStatus
 from app.models.budget_category import BudgetCategory
 from app.models.budget_version import BudgetVersion
 from app.models.category_profit import CategoryProfit
 from app.models.rendering import Rendering, RenderingImage, RenderingItem, RenderingStatus
+from app.models.rendering_version import RenderingVersion
+from app.models.notification import NotificationSettings, NotificationRecipient
 
 __all__ = [
     "Base",
@@ -30,6 +33,7 @@ __all__ = [
     "UnitType",
     "Visit",
     "VisitStatus",
+    "VisitAttachment",
     "Budget",
     "BudgetItem",
     "BudgetStatus",
@@ -39,5 +43,8 @@ __all__ = [
     "Rendering",
     "RenderingImage",
     "RenderingItem",
-    "RenderingStatus"
+    "RenderingStatus",
+    "RenderingVersion",
+    "NotificationSettings",
+    "NotificationRecipient",
 ]

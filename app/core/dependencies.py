@@ -32,7 +32,8 @@ from app.repositories import (
     CategoryProfitRepository,
     RenderingRepository,
     RenderingImageRepository,
-    RenderingItemRepository
+    RenderingItemRepository,
+    RenderingVersionRepository
 )
 from app.services import (
     CompanyService,
@@ -341,6 +342,11 @@ def get_rendering_item_repository(db: Session = Depends(get_db)) -> RenderingIte
     return RenderingItemRepository(db)
 
 
+def get_rendering_version_repository(db: Session = Depends(get_db)) -> RenderingVersionRepository:
+    """Get RenderingVersion repository instance."""
+    return RenderingVersionRepository(db)
+
+
 # Rendering Service Factory
 
 def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
@@ -356,6 +362,7 @@ def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
     rendering_repo = get_rendering_repository(db)
     rendering_image_repo = get_rendering_image_repository(db)
     rendering_item_repo = get_rendering_item_repository(db)
+    rendering_version_repo = get_rendering_version_repository(db)
     visit_repo = get_visit_repository(db)
     budget_repo = get_budget_repository(db)
     budget_item_repo = get_budget_item_repository(db)
@@ -364,6 +371,7 @@ def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
         rendering_repository=rendering_repo,
         rendering_image_repository=rendering_image_repo,
         rendering_item_repository=rendering_item_repo,
+        rendering_version_repository=rendering_version_repo,
         visit_repository=visit_repo,
         budget_repository=budget_repo,
         budget_item_repository=budget_item_repo

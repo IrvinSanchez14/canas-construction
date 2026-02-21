@@ -66,7 +66,7 @@ class CategoryProfitResponse(CategoryProfitBase):
     def from_orm_with_details(cls, profit):
         """Create response with creator name."""
         data = {
-            **profit.__dict__,
+            **{k: v for k, v in profit.__dict__.items() if not k.startswith('_')},
             "created_by_name": (
                 profit.created_by.full_name if profit.created_by else None
             ),
