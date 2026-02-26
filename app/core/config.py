@@ -10,18 +10,32 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         # pydantic_settings JSON-parses List fields from env vars before
-        # validators run. Empty strings cause JSONDecodeError, so temporarily
-        # remove them to let defaults apply instead.
+        # validators run. Non-JSON strings (e.g. "user@email.com") cause
+        # JSONDecodeError. Convert them to valid JSON arrays first.
         _list_env_vars = ["SETUP_ALLOWED_EMAILS", "CORS_ORIGINS"]
-        _removed = {}
+        _original = {}
         for var in _list_env_vars:
             val = os.environ.get(var)
-            if val is not None and not val.strip():
-                _removed[var] = os.environ.pop(var)
+            if val is None:
+                continue
+            _original[var] = val
+            stripped = val.strip()
+            if not stripped:
+                os.environ.pop(var)
+            else:
+                try:
+                    json.loads(stripped)
+                except json.JSONDecodeError:
+                    items = [i.strip() for i in stripped.split(",") if i.strip()]
+                    os.environ[var] = json.dumps(items)
         try:
             super().__init__(**kwargs)
         finally:
-            os.environ.update(_removed)
+            for var, orig in _original.items():
+                os.environ[var] = orig
+            for var in _list_env_vars:
+                if var not in _original and var in os.environ:
+                    os.environ.pop(var)
 
     # Application
     APP_NAME: str = "Canas Construction API"
