@@ -1,6 +1,7 @@
 """Budget Repository - Data Access Layer."""
 
 from typing import List, Optional
+from datetime import date, datetime, time
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from uuid import UUID
@@ -86,6 +87,8 @@ class BudgetRepository(BaseRepository[Budget]):
         skip: int = 0,
         limit: int = 100,
         status: Optional[BudgetStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
         include_categories: bool = True
     ) -> List[Budget]:
         """Get all budgets for a company by joining through visits -> projects -> clients."""
@@ -103,6 +106,11 @@ class BudgetRepository(BaseRepository[Budget]):
 
         if status:
             query = query.filter(Budget.status == status)
+
+        if date_from:
+            query = query.filter(Budget.created_at >= datetime.combine(date_from, time.min))
+        if date_to:
+            query = query.filter(Budget.created_at <= datetime.combine(date_to, time.max))
 
         if include_categories:
             query = query.options(

@@ -1,6 +1,7 @@
 """Project Repository - Data Access Layer."""
 
 from typing import List, Optional
+from datetime import date, datetime, time
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 
@@ -64,6 +65,8 @@ class ProjectRepository(BaseRepository[Project]):
         limit: int = 100,
         status: Optional[ProjectStatus] = None,
         category_id: Optional[UUID] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
         include_details: bool = True,
         include_creator: bool = True
     ) -> List[Project]:
@@ -76,6 +79,8 @@ class ProjectRepository(BaseRepository[Project]):
             limit: Pagination limit
             status: Optional status filter
             category_id: Optional category filter
+            date_from: Filter projects created on or after this date
+            date_to: Filter projects created on or before this date
             include_details: Whether to eager load relationships
             include_creator: Whether to eager load creator user
         """
@@ -90,6 +95,11 @@ class ProjectRepository(BaseRepository[Project]):
 
         if category_id:
             query = query.filter(Project.category_id == category_id)
+
+        if date_from:
+            query = query.filter(Project.created_at >= datetime.combine(date_from, time.min))
+        if date_to:
+            query = query.filter(Project.created_at <= datetime.combine(date_to, time.max))
 
         if include_details:
             query = query.options(

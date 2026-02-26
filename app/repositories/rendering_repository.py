@@ -1,9 +1,11 @@
 """Rendering Repository - Data Access Layer."""
 
 from typing import List, Optional
+from datetime import date, datetime, time
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 
+from sqlalchemy import or_
 from app.models import Rendering, RenderingStatus
 from app.models.rendering import RenderingImage, RenderingItem
 from app.repositories.base import BaseRepository
@@ -21,7 +23,7 @@ class RenderingRepository(BaseRepository[Rendering]):
             self.db.query(Rendering)
             .options(
                 joinedload(Rendering.images),
-                joinedload(Rendering.items),
+                joinedload(Rendering.items).joinedload(RenderingItem.budget_item),
                 joinedload(Rendering.visit),
                 joinedload(Rendering.budget)
             )
@@ -106,35 +108,58 @@ class RenderingRepository(BaseRepository[Rendering]):
         skip: int = 0,
         limit: int = 100,
         status: Optional[RenderingStatus] = None,
+        project_id: Optional[UUID] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
         include_details: bool = True
     ) -> List[Rendering]:
         """
-        Get all renderings for a company by joining through visits to projects to clients.
+        Get all renderings for a company.
 
-        Args:
-            company_id: Company ID to filter by
-            skip: Pagination offset
-            limit: Pagination limit
-            status: Optional status filter
-            include_details: Whether to eager load images and items
+        Renderings can be linked via project_id directly or via visit_id -> project -> client.
         """
         from app.models import Visit, Project, Client
 
-        query = (
-            self.db.query(Rendering)
-            .join(Rendering.visit)
+        # Subquery for renderings linked via project_id
+        project_subq = (
+            self.db.query(Rendering.id)
+            .join(Project, Rendering.project_id == Project.id)
+            .join(Project.client)
+            .filter(Client.company_id == company_id)
+        )
+
+        # Subquery for renderings linked via visit_id (legacy)
+        visit_subq = (
+            self.db.query(Rendering.id)
+            .join(Visit, Rendering.visit_id == Visit.id)
             .join(Visit.project)
             .join(Project.client)
             .filter(Client.company_id == company_id)
         )
 
+        query = self.db.query(Rendering).filter(
+            or_(
+                Rendering.id.in_(project_subq),
+                Rendering.id.in_(visit_subq)
+            )
+        )
+
         if status:
             query = query.filter(Rendering.status == status)
+
+        if project_id:
+            query = query.filter(Rendering.project_id == project_id)
+
+        if date_from:
+            query = query.filter(Rendering.created_at >= datetime.combine(date_from, time.min))
+        if date_to:
+            query = query.filter(Rendering.created_at <= datetime.combine(date_to, time.max))
 
         if include_details:
             query = query.options(
                 joinedload(Rendering.images),
                 joinedload(Rendering.items),
+                joinedload(Rendering.project),
                 joinedload(Rendering.visit),
                 joinedload(Rendering.budget)
             )

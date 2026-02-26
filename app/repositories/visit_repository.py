@@ -1,6 +1,7 @@
 """Visit Repository - Data Access Layer."""
 
 from typing import List, Optional
+from datetime import date, datetime, time
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 
@@ -136,39 +137,48 @@ class VisitRepository(BaseRepository[Visit]):
         skip: int = 0,
         limit: int = 100,
         status: Optional[VisitStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
         include_details: bool = True,
         include_creators: bool = True
     ) -> List[Visit]:
         """
         Get all visits for a company by joining through projects to clients.
-        
+
         Args:
             company_id: Company ID to filter by
             skip: Pagination offset
             limit: Pagination limit
             status: Optional status filter
+            date_from: Filter visits created on or after this date
+            date_to: Filter visits created on or before this date
             include_details: Whether to eager load project details
             include_creators: Whether to eager load creator and editor users
         """
         from app.models import Project, Client
-        
+
         query = (
             self.db.query(Visit)
             .join(Visit.project)
             .join(Project.client)
             .filter(Client.company_id == company_id)
         )
-        
+
         if status:
             query = query.filter(Visit.status == status)
-        
+
+        if date_from:
+            query = query.filter(Visit.created_at >= datetime.combine(date_from, time.min))
+        if date_to:
+            query = query.filter(Visit.created_at <= datetime.combine(date_to, time.max))
+
         if include_details:
             query = query.options(joinedload(Visit.project))
-        
+
         if include_creators:
             query = query.options(
                 joinedload(Visit.created_by),
                 joinedload(Visit.edited_by)
             )
-        
+
         return query.order_by(Visit.created_at.desc()).offset(skip).limit(limit).all()

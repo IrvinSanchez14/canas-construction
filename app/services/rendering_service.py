@@ -12,7 +12,7 @@ Business logic for Rendering management:
 from typing import List, Optional
 from uuid import UUID
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 
 from app.models import Rendering, RenderingStatus
 from app.models.rendering import RenderingImage, RenderingItem
@@ -23,7 +23,7 @@ from app.repositories.rendering_repository import (
     RenderingItemRepository
 )
 from app.repositories.rendering_version_repository import RenderingVersionRepository
-from app.repositories import VisitRepository, BudgetRepository, BudgetItemRepository
+from app.repositories import VisitRepository, BudgetRepository, BudgetItemRepository, ProjectRepository
 from app.schemas.rendering import (
     RenderingCreate,
     RenderingUpdate,
@@ -59,7 +59,8 @@ class RenderingService:
         rendering_version_repository: RenderingVersionRepository,
         visit_repository: VisitRepository,
         budget_repository: BudgetRepository,
-        budget_item_repository: BudgetItemRepository
+        budget_item_repository: BudgetItemRepository,
+        project_repository: ProjectRepository = None
     ):
         """Initialize service with all dependencies injected."""
         self.rendering_repository = rendering_repository
@@ -69,6 +70,7 @@ class RenderingService:
         self.visit_repository = visit_repository
         self.budget_repository = budget_repository
         self.budget_item_repository = budget_item_repository
+        self.project_repository = project_repository
 
     # ============== Version Management (internal) ==============
 
@@ -212,6 +214,14 @@ class RenderingService:
             NotFoundException: If visit or budget not found
             ValidationException: If visit/budget doesn't belong to company
         """
+        # Validate project if provided
+        if rendering_data.project_id and self.project_repository:
+            project = self.project_repository.get_by_id(rendering_data.project_id)
+            if not project:
+                raise NotFoundException(f"Project with ID {rendering_data.project_id} not found")
+            if project.client.company_id != company_id:
+                raise ValidationException("Project does not belong to your company")
+
         # Validate visit if provided
         if rendering_data.visit_id:
             visit = self.visit_repository.get_by_id_with_details(rendering_data.visit_id)
@@ -235,12 +245,44 @@ class RenderingService:
             notes=rendering_data.notes,
             expiration_date=rendering_data.expiration_date,
             status=rendering_data.status,
+            project_id=rendering_data.project_id,
             visit_id=rendering_data.visit_id,
             budget_id=rendering_data.budget_id,
             total_amount=Decimal('0')
         )
 
         logger.info(f"Created rendering {rendering.id}")
+
+        # Send notification
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+
+            details = {"Status": rendering.status.value}
+            if rendering_data.project_id and self.project_repository:
+                project = self.project_repository.get_by_id(rendering_data.project_id)
+                if project:
+                    details["Project"] = project.name
+            if rendering_data.expiration_date:
+                details["Expiration"] = str(rendering_data.expiration_date)
+
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.rendering_repository.db,
+                    "rendering.created",
+                    "Rendering",
+                    rendering.id,
+                    rendering.title,
+                    company_id,
+                    None,
+                    details
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+
         return rendering
 
     def get_rendering(self, rendering_id: UUID, company_id: UUID) -> Rendering:
@@ -271,11 +313,14 @@ class RenderingService:
     def get_renderings(
         self,
         company_id: UUID,
+        project_id: Optional[UUID] = None,
         visit_id: Optional[UUID] = None,
         budget_id: Optional[UUID] = None,
         status: Optional[RenderingStatus] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None
     ) -> List[Rendering]:
         """
         Get renderings with optional filters and multi-tenant isolation.
@@ -320,7 +365,10 @@ class RenderingService:
             company_id=company_id,
             skip=skip,
             limit=limit,
-            status=status
+            status=status,
+            project_id=project_id,
+            date_from=date_from,
+            date_to=date_to
         )
 
     def update_rendering(
@@ -559,10 +607,18 @@ class RenderingService:
             max_order = self.rendering_item_repository.get_max_order_index(rendering_id)
             item_data.order_index = max_order + 1
 
-        # Calculate subtotal and total (including tax if provided)
-        subtotal = item_data.quantity * item_data.unit_price
+        # Use provided subtotal/total if present, otherwise calculate from quantity * unit_price
+        if item_data.subtotal and item_data.subtotal > 0:
+            subtotal = item_data.subtotal
+        else:
+            subtotal = item_data.quantity * item_data.unit_price
+
         tax_amount = item_data.tax if item_data.tax else Decimal('0')
-        total = subtotal + tax_amount
+
+        if item_data.total and item_data.total > 0:
+            total = item_data.total
+        else:
+            total = subtotal + tax_amount
 
         item = self.rendering_item_repository.create(
             rendering_id=rendering_id,
@@ -597,12 +653,22 @@ class RenderingService:
 
         update_dict = item_data.model_dump(exclude_unset=True)
 
-        # Recalculate subtotal and total if price fields changed
+        # Use provided subtotal/total if present, otherwise calculate from quantity * unit_price
+        provided_subtotal = update_dict.get('subtotal')
+        provided_total = update_dict.get('total')
         quantity = update_dict.get('quantity', item.quantity)
         unit_price = update_dict.get('unit_price', item.unit_price)
         tax = update_dict.get('tax', item.tax) or Decimal('0')
-        update_dict['subtotal'] = quantity * unit_price
-        update_dict['total'] = update_dict['subtotal'] + tax
+
+        if provided_subtotal and Decimal(str(provided_subtotal)) > 0:
+            update_dict['subtotal'] = Decimal(str(provided_subtotal))
+        else:
+            update_dict['subtotal'] = quantity * unit_price
+
+        if provided_total and Decimal(str(provided_total)) > 0:
+            update_dict['total'] = Decimal(str(provided_total))
+        else:
+            update_dict['total'] = update_dict['subtotal'] + tax
 
         for key, value in update_dict.items():
             setattr(item, key, value)

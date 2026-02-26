@@ -10,6 +10,7 @@ Provides complete CRUD operations for project visits including:
 
 from fastapi import APIRouter, Depends, status, Query
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 
 from app.core.dependencies import get_visit_service
@@ -66,6 +67,8 @@ def list_visits(
     company_id: UUID = Query(..., description="Filter by company ID (REQUIRED)"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
     status_filter: Optional[VisitStatus] = Query(None, alias="status", description="Filter by visit status"),
+    date_from: Optional[date] = Query(None, description="Filter records created on or after this date"),
+    date_to: Optional[date] = Query(None, description="Filter records created on or before this date"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     include_details: bool = Query(True, description="Include project and user details"),
@@ -96,7 +99,9 @@ def list_visits(
         status=status_filter,
         skip=skip,
         limit=limit,
-        include_details=include_details
+        include_details=include_details,
+        date_from=date_from,
+        date_to=date_to
     )
 
     # Convert to detail response with creator names

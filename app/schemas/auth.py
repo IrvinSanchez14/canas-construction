@@ -37,13 +37,32 @@ class TokenPayload(BaseModel):
     type: str = Field(..., description="Token type (access or refresh)")
 
 
+class SetupLinkRequest(BaseModel):
+    """Schema for requesting a setup magic link."""
+    email: EmailStr = Field(..., description="Email address to send setup link to")
+
+
+class SetupLinkResponse(BaseModel):
+    """Schema for setup link response (generic to prevent email enumeration)."""
+    message: str = Field(default="If this email is authorized, a setup link has been sent.")
+
+
+class SetupTokenVerifyResponse(BaseModel):
+    """Schema for setup token verification response."""
+    valid: bool
+    email: Optional[str] = None
+
+
 class CompanySetupRequest(BaseModel):
     """
     Schema for initial company setup.
 
     This is used to create the first company and admin user.
-    Should be protected or only available during initial setup.
+    Requires a valid setup token from the magic link flow.
     """
+    # Setup token
+    setup_token: str = Field(..., description="Setup token from magic link")
+
     # Company info
     company_name: str = Field(..., min_length=1, max_length=255)
     company_email: EmailStr

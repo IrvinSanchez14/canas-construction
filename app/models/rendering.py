@@ -45,7 +45,15 @@ class Rendering(BaseModel):
     # Version tracking
     current_version = Column(Integer, nullable=False, default=0)
 
-    # Foreign key to visit (optional, can exist without visit)
+    # Foreign key to project
+    project_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    # Foreign key to visit (optional)
     visit_id = Column(
         UUID(as_uuid=True),
         ForeignKey("visits.id", ondelete="SET NULL"),
@@ -70,6 +78,7 @@ class Rendering(BaseModel):
     approved_by_client_name = Column(String(255), nullable=True)
 
     # Relationships
+    project = relationship("Project", foreign_keys=[project_id])
     visit = relationship("Visit", foreign_keys=[visit_id])
     budget = relationship("Budget", foreign_keys=[budget_id])
     images = relationship(

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Text, Enum, Numeric, Date, DateTime, JSON
+from sqlalchemy import Column, String, ForeignKey, Text, Enum, Numeric, Date, Time, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -39,6 +39,7 @@ class Visit(BaseModel):
 
     # Visit details
     visit_date = Column(Date, nullable=True)
+    visit_time = Column(Time, nullable=True)
     inspection_notes = Column(Text, nullable=True)
     
     # Financial information collected during visit

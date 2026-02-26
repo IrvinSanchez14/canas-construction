@@ -20,6 +20,7 @@ SECRET_KEY = "your-secret-key-change-this-in-production-use-env-variable"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 1  # 1 day as requested
 REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days
+SETUP_TOKEN_EXPIRE_HOURS = 24  # 24 hours
 
 
 class JWTHandler:
@@ -36,13 +37,15 @@ class JWTHandler:
         secret_key: str = SECRET_KEY,
         algorithm: str = ALGORITHM,
         access_token_expire_days: int = ACCESS_TOKEN_EXPIRE_DAYS,
-        refresh_token_expire_days: int = REFRESH_TOKEN_EXPIRE_DAYS
+        refresh_token_expire_days: int = REFRESH_TOKEN_EXPIRE_DAYS,
+        setup_token_expire_hours: int = SETUP_TOKEN_EXPIRE_HOURS
     ):
         """Initialize JWT handler with configuration."""
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.access_token_expire_days = access_token_expire_days
         self.refresh_token_expire_days = refresh_token_expire_days
+        self.setup_token_expire_hours = setup_token_expire_hours
 
     def create_access_token(
         self,
@@ -143,6 +146,29 @@ class JWTHandler:
             logger.warning(f"Invalid token: {str(e)}")
             raise InvalidTokenError(f"Invalid token: {str(e)}")
 
+    def create_setup_token(self, email: str) -> str:
+        """
+        Create JWT setup token for magic link company setup.
+
+        Args:
+            email: Email address to encode in token
+
+        Returns:
+            Encoded JWT token string
+        """
+        expire = datetime.utcnow() + timedelta(hours=self.setup_token_expire_hours)
+
+        to_encode = {
+            "sub": email,
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "type": "setup"
+        }
+
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        logger.info(f"Created setup token for email {email}, expires at {expire}")
+        return encoded_jwt
+
     def decode_token_without_verification(self, token: str) -> Dict[str, Any]:
         """
         Decode token without verification (useful for debugging).
@@ -181,3 +207,13 @@ def verify_access_token(token: str) -> Dict[str, Any]:
 def verify_refresh_token(token: str) -> Dict[str, Any]:
     """Verify refresh token (convenience function)."""
     return jwt_handler.verify_token(token, token_type="refresh")
+
+
+def create_setup_token(email: str) -> str:
+    """Create setup token (convenience function)."""
+    return jwt_handler.create_setup_token(email)
+
+
+def verify_setup_token(token: str) -> Dict[str, Any]:
+    """Verify setup token (convenience function)."""
+    return jwt_handler.verify_token(token, token_type="setup")

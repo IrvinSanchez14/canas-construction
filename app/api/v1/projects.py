@@ -4,6 +4,7 @@ Project endpoints with dependency injection, clean architecture, and N+1 optimiz
 
 from fastapi import APIRouter, Depends, status, Query
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 
 from app.core.dependencies import get_project_service
@@ -50,6 +51,8 @@ def list_projects(
     status_filter: Optional[ProjectStatus] = Query(None, alias="status", description="Filter by project status"),
     category_id: Optional[UUID] = Query(None, description="Filter by category ID"),
     client_id: Optional[UUID] = Query(None, description="Filter by client ID"),
+    date_from: Optional[date] = Query(None, description="Filter records created on or after this date"),
+    date_to: Optional[date] = Query(None, description="Filter records created on or before this date"),
     include_details: bool = Query(True, description="Include client and category details"),
     include_creator: bool = Query(True, description="Include creator details (user who created the project)"),
     service: ProjectService = Depends(get_project_service)
@@ -86,7 +89,9 @@ def list_projects(
         status=status_filter,
         category_id=category_id,
         client_id=client_id,
-        include_details=include_details
+        include_details=include_details,
+        date_from=date_from,
+        date_to=date_to
     )
 
     # Convert to detail response with creator names

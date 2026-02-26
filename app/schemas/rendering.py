@@ -117,6 +117,7 @@ class RenderingBase(BaseModel):
 
 class RenderingCreate(RenderingBase):
     """Schema for creating a rendering."""
+    project_id: Optional[UUID] = None
     visit_id: Optional[UUID] = None
     budget_id: Optional[UUID] = None
     expiration_date: Optional[date] = None
@@ -129,6 +130,7 @@ class RenderingUpdate(BaseModel):
     notes: Optional[str] = None
     expiration_date: Optional[date] = None
     status: Optional[RenderingStatus] = None
+    project_id: Optional[UUID] = None
     visit_id: Optional[UUID] = None
     budget_id: Optional[UUID] = None
     sent_to_email: Optional[str] = Field(None, max_length=255)
@@ -139,6 +141,7 @@ class RenderingResponse(RenderingBase):
     """Schema for rendering response."""
     id: UUID
     total_amount: Decimal
+    project_id: Optional[UUID] = None
     visit_id: Optional[UUID] = None
     budget_id: Optional[UUID] = None
     expiration_date: Optional[date] = None
@@ -175,7 +178,7 @@ class RenderingDetailResponse(RenderingResponse):
             "items": [RenderingItemResponse.model_validate(item) for item in rendering.items],
             "visit_title": rendering.visit.title if rendering.visit else None,
             "budget_title": rendering.budget.title if rendering.budget else None,
-            "project_name": rendering.visit.project.name if rendering.visit and rendering.visit.project else None,
+            "project_name": rendering.project.name if rendering.project else (rendering.visit.project.name if rendering.visit and rendering.visit.project else None),
         }
         return cls(**data)
 

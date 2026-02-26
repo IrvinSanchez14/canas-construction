@@ -10,6 +10,7 @@ Business logic for Visit management:
 """
 
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 from decimal import Decimal
 
@@ -111,6 +112,7 @@ class VisitService:
             description=visit_data.description,
             status=visit_data.status,
             visit_date=visit_data.visit_date,
+            visit_time=visit_data.visit_time,
             inspection_notes=visit_data.inspection_notes,
             estimated_materials_cost=visit_data.estimated_materials_cost,
             estimated_labor_cost=visit_data.estimated_labor_cost,
@@ -123,6 +125,34 @@ class VisitService:
         )
 
         logger.info(f"Created visit {visit.id} for project {visit_data.project_id}")
+
+        # Send notification
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.visit_repository.db,
+                    "visit.created",
+                    "Visit",
+                    visit.id,
+                    visit.title,
+                    company_id,
+                    None,
+                    {
+                        "Project": project.name,
+                        "Status": visit.status.value,
+                        "Date": str(visit.visit_date) if visit.visit_date else "N/A",
+                        "Time": str(visit.visit_time) if visit.visit_time else "N/A",
+                    }
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+
         return visit
 
     def get_visit(self, visit_id: UUID, company_id: UUID) -> Visit:
@@ -162,7 +192,9 @@ class VisitService:
         status: Optional[VisitStatus] = None,
         skip: int = 0,
         limit: int = 100,
-        include_details: bool = True
+        include_details: bool = True,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None
     ) -> List[Visit]:
         """
         Get visits with optional filters and multi-tenant isolation.
@@ -205,6 +237,8 @@ class VisitService:
             skip=skip,
             limit=limit,
             status=status,
+            date_from=date_from,
+            date_to=date_to,
             include_details=include_details
         )
 
@@ -263,6 +297,34 @@ class VisitService:
         self.visit_repository.db.refresh(visit)
 
         logger.info(f"Updated visit {visit_id}")
+
+        # Send notification
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.visit_repository.db,
+                    "visit.updated",
+                    "Visit",
+                    visit.id,
+                    visit.title,
+                    company_id,
+                    None,
+                    {
+                        "Project": visit.project.name if visit.project else "N/A",
+                        "Status": visit.status.value,
+                        "Date": str(visit.visit_date) if visit.visit_date else "N/A",
+                        "Time": str(visit.visit_time) if visit.visit_time else "N/A",
+                    }
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+
         return visit
 
     def delete_visit(self, visit_id: UUID, company_id: UUID) -> bool:

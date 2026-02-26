@@ -8,6 +8,7 @@ Provides complete CRUD for budgets, categories, items, and version history.
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 
 from app.core.database import get_db
@@ -60,6 +61,8 @@ def list_budgets(
     company_id: UUID = Query(..., description="Filter by company ID (REQUIRED)"),
     visit_id: Optional[UUID] = Query(None, description="Filter by visit ID"),
     status_filter: Optional[BudgetStatus] = Query(None, alias="status", description="Filter by budget status"),
+    date_from: Optional[date] = Query(None, description="Filter records created on or after this date"),
+    date_to: Optional[date] = Query(None, description="Filter records created on or before this date"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     service: BudgetService = Depends(get_budget_service)
@@ -70,7 +73,9 @@ def list_budgets(
         visit_id=visit_id,
         status=status_filter,
         skip=skip,
-        limit=limit
+        limit=limit,
+        date_from=date_from,
+        date_to=date_to
     )
     return [BudgetDetailResponse.from_orm_with_details(budget) for budget in budgets]
 
@@ -174,6 +179,18 @@ def add_category(
     """
     cat_obj = service.add_category(budget_id, category, company_id, created_by_user_id)
     return BudgetCategoryDetailResponse.from_orm_with_details(cat_obj)
+
+
+@router.put("/{budget_id}/categories/reorder", status_code=status.HTTP_200_OK)
+def reorder_categories(
+    budget_id: UUID,
+    category_ids: List[UUID],
+    company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
+    service: BudgetService = Depends(get_budget_service)
+):
+    """Reorder budget categories by providing an ordered list of category IDs."""
+    service.reorder_categories(budget_id, category_ids, company_id)
+    return {"ok": True}
 
 
 @router.put("/{budget_id}/categories/{category_id}", response_model=BudgetCategoryDetailResponse)

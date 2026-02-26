@@ -59,6 +59,32 @@ class EmailService:
             logger.error(f"Failed to send email to {to}: {str(e)}")
             return False
     
+    async def send_setup_magic_link_email(
+        self,
+        to: str,
+        setup_url: str,
+        company_name: str = "Canas Construction"
+    ) -> bool:
+        """Send setup magic link email."""
+        try:
+            html = self.render_template(
+                "setup_magic_link.html",
+                setup_url=setup_url,
+                company_name=company_name or settings.COMPANY_NAME,
+                company_logo_url=settings.COMPANY_LOGO_URL
+            )
+
+            return await self.send_email(
+                to=[to],
+                subject="Company Setup Link",
+                html=html,
+                from_name=settings.RESEND_FROM_NAME
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send setup magic link email: {str(e)}")
+            return False
+
     async def send_entity_created_email(
         self,
         to: List[str],
@@ -78,7 +104,8 @@ class EmailService:
                 created_at=created_at,
                 created_by=created_by,
                 details=details or {},
-                company_name=company_name
+                company_name=company_name or settings.COMPANY_NAME,
+                company_logo_url=settings.COMPANY_LOGO_URL
             )
             
             subject = f"New {entity_type} Created: {entity_name}"

@@ -366,6 +366,7 @@ def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
     visit_repo = get_visit_repository(db)
     budget_repo = get_budget_repository(db)
     budget_item_repo = get_budget_item_repository(db)
+    project_repo = get_project_repository(db)
 
     return RenderingService(
         rendering_repository=rendering_repo,
@@ -374,5 +375,6 @@ def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
         rendering_version_repository=rendering_version_repo,
         visit_repository=visit_repo,
         budget_repository=budget_repo,
-        budget_item_repository=budget_item_repo
+        budget_item_repository=budget_item_repo,
+        project_repository=project_repo
     )

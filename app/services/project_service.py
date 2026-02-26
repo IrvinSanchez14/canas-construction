@@ -9,6 +9,7 @@ Business logic for Project management:
 """
 
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 
 from app.models import Project, ProjectStatus
@@ -147,9 +148,8 @@ class ProjectService:
                     None,  # created_by
                     {
                         "Client": client.name,
-                        "Category": category.name,
                         "Status": project.status.value,
-                        "Address": project.address if project.address else "N/A"
+                        "Location": project.address if project.address else "N/A"
                     }
                 ),
                 daemon=True
@@ -211,7 +211,9 @@ class ProjectService:
         status: Optional[ProjectStatus] = None,
         category_id: Optional[UUID] = None,
         client_id: Optional[UUID] = None,
-        include_details: bool = True
+        include_details: bool = True,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None
     ) -> List[Project]:
         """
         Get projects for a company with optional filters.
@@ -224,6 +226,8 @@ class ProjectService:
             category_id: Optional category filter
             client_id: Optional client filter
             include_details: Whether to include details (N+1 optimized)
+            date_from: Filter projects created on or after this date
+            date_to: Filter projects created on or before this date
 
         Returns:
             List of projects
@@ -244,6 +248,8 @@ class ProjectService:
                 limit=limit,
                 status=status,
                 category_id=category_id,
+                date_from=date_from,
+                date_to=date_to,
                 include_details=include_details
             )
 

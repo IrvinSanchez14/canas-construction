@@ -344,28 +344,40 @@ class RenderingPDFService:
         # Empty separator
         y -= 4
 
-        # --- Quantity row ---
-        qty_str = f"{item.quantity}" if item.quantity else "1"
-        if item.unit:
-            qty_str = f"{qty_str}{item.unit}"
+        # --- Quantity row (prefer budget item values) ---
+        qty = item.quantity
+        unit = item.unit
+        if item.budget_item:
+            qty = item.budget_item.quantity or qty
+            unit = item.budget_item.unit or unit
+        qty_str = f"{qty}" if qty else "1"
+        if unit:
+            qty_str = f"{qty_str} {unit}"
         _draw_full_row("Quantity:", qty_str)
 
         # Empty separator
         y -= 4
 
-        # --- Subtotal row (blue bg, bold) ---
+        # --- Pricing: prefer rendering item values, fall back to linked budget item ---
         subtotal = float(item.subtotal or 0)
+        tax = float(item.tax or 0)
+        total = float(item.total or 0)
+
+        if subtotal == 0 and item.budget_item:
+            subtotal = float(item.budget_item.subtotal or 0)
+        if total == 0 and item.budget_item:
+            total = float(item.budget_item.subtotal or 0) + tax
+
+        # --- Subtotal row (blue bg, bold) ---
         _draw_price_row("Subtotal:", f"${subtotal:,.2f}", bg=HEADER_BG, bold=True)
 
         # --- Delivery Fee ---
         _draw_price_row("Delivery Fee:", "$0.00")
 
         # --- Tax row ---
-        tax = float(item.tax or 0)
         _draw_price_row("MA Sales Tax:", f"${tax:,.2f}")
 
         # --- Total row (blue bg, bold) ---
-        total = float(item.total or 0)
         _draw_price_row("Total:", f"${total:,.2f}", bg=HEADER_BG, bold=True)
 
         # --- Disclaimer text ---

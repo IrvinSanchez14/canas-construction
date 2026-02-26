@@ -12,6 +12,7 @@ Provides complete CRUD operations for visual project proposals including:
 from fastapi import APIRouter, Depends, status, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
+from datetime import date
 from uuid import UUID
 from io import BytesIO
 from datetime import datetime
@@ -73,9 +74,12 @@ def create_rendering(
 @router.get("/", response_model=List[RenderingResponse])
 def list_renderings(
     company_id: UUID = Query(..., description="Filter by company ID (REQUIRED)"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
     visit_id: Optional[UUID] = Query(None, description="Filter by visit ID"),
     budget_id: Optional[UUID] = Query(None, description="Filter by budget ID"),
     status_filter: Optional[RenderingStatus] = Query(None, alias="status", description="Filter by status"),
+    date_from: Optional[date] = Query(None, description="Filter records created on or after this date"),
+    date_to: Optional[date] = Query(None, description="Filter records created on or before this date"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     service: RenderingService = Depends(get_rendering_service)
@@ -95,11 +99,14 @@ def list_renderings(
     """
     return service.get_renderings(
         company_id=company_id,
+        project_id=project_id,
         visit_id=visit_id,
         budget_id=budget_id,
         status=status_filter,
         skip=skip,
-        limit=limit
+        limit=limit,
+        date_from=date_from,
+        date_to=date_to
     )
 
 

@@ -12,7 +12,7 @@ Business logic for Budget management:
 from typing import List, Optional, Tuple
 from uuid import UUID
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 
 from app.models import Budget, BudgetItem, BudgetStatus, ProjectStatus
 from app.models.budget_category import BudgetCategory
@@ -251,6 +251,33 @@ class BudgetService:
         self.budget_repository.db.refresh(budget)
 
         logger.info(f"Created budget {budget.id} for visit {budget_data.visit_id}")
+
+        # Send notification
+        try:
+            from app.core.notifications import send_notification_background
+            import threading
+
+            threading.Thread(
+                target=send_notification_background,
+                args=(
+                    self.budget_repository.db,
+                    "budget.created",
+                    "Budget",
+                    budget.id,
+                    budget.title,
+                    company_id,
+                    None,
+                    {
+                        "Visit": visit.title,
+                        "Project": visit.project.name if visit.project else "N/A",
+                        "Status": budget.status.value,
+                    }
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to queue notification: {str(e)}")
+
         return budget
 
     def get_budget(self, budget_id: UUID, company_id: UUID) -> Budget:
@@ -267,7 +294,9 @@ class BudgetService:
         visit_id: Optional[UUID] = None,
         status: Optional[BudgetStatus] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None
     ) -> List[Budget]:
         """Get budgets with optional filters and multi-tenant isolation."""
         if visit_id:
@@ -279,6 +308,8 @@ class BudgetService:
             skip=skip,
             limit=limit,
             status=status,
+            date_from=date_from,
+            date_to=date_to,
             include_categories=True
         )
 
@@ -401,6 +432,24 @@ class BudgetService:
 
         logger.info(f"Updated category {category_id} in budget {budget_id}")
         return category
+
+    def reorder_categories(
+        self,
+        budget_id: UUID,
+        category_ids: List[UUID],
+        company_id: UUID,
+    ) -> None:
+        """Reorder budget categories by setting order_index from the provided list."""
+        budget = self.get_budget(budget_id, company_id)
+        categories = self.budget_category_repository.get_by_budget(budget_id, include_items=False)
+
+        cat_map = {c.id: c for c in categories}
+        for idx, cat_id in enumerate(category_ids):
+            cat = cat_map.get(cat_id)
+            if cat:
+                self.budget_category_repository.update(cat, order_index=idx)
+
+        logger.info(f"Reordered {len(category_ids)} categories in budget {budget_id}")
 
     def delete_category(
         self,

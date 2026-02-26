@@ -8,14 +8,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.jwt import create_access_token, create_refresh_token, verify_refresh_token
+from app.core.config import settings
+from app.core.jwt import create_access_token, create_refresh_token, verify_refresh_token, create_setup_token, verify_setup_token
 from app.core.password import password_hasher
 from app.repositories import UserRepository, CompanyRepository, RoleRepository
 from app.services import UserService, CompanyService, RoleService
+from app.services.email_service import EmailService
 from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
     RefreshTokenRequest,
+    SetupLinkRequest,
+    SetupLinkResponse,
+    SetupTokenVerifyResponse,
     CompanySetupRequest,
     CompanySetupResponse
 )
@@ -176,6 +181,52 @@ def refresh_token(
         )
 
 
+@router.post("/setup/request-link", response_model=SetupLinkResponse)
+async def request_setup_link(
+    request_data: SetupLinkRequest,
+):
+    """
+    Request a magic link for company setup.
+
+    Returns the same response regardless of whether the email is authorized,
+    to prevent email enumeration.
+    """
+    email = request_data.email.lower()
+    allowed_emails = [e.lower() for e in settings.SETUP_ALLOWED_EMAILS]
+
+    if email in allowed_emails:
+        token = create_setup_token(email)
+        setup_url = f"{settings.FRONTEND_URL}/setup/create?token={token}"
+
+        email_service = EmailService()
+        await email_service.send_setup_magic_link_email(
+            to=email,
+            setup_url=setup_url,
+            company_name=settings.COMPANY_NAME
+        )
+        logger.info(f"Setup magic link sent to {email}")
+    else:
+        logger.info(f"Setup link requested for unauthorized email: {email}")
+
+    return SetupLinkResponse()
+
+
+@router.get("/setup/verify", response_model=SetupTokenVerifyResponse)
+def verify_setup_token_endpoint(
+    token: str,
+):
+    """
+    Verify a setup token from a magic link.
+
+    Returns whether the token is valid and the associated email.
+    """
+    try:
+        payload = verify_setup_token(token)
+        return SetupTokenVerifyResponse(valid=True, email=payload.get("sub"))
+    except InvalidTokenError:
+        return SetupTokenVerifyResponse(valid=False)
+
+
 @router.post("/setup", response_model=CompanySetupResponse, status_code=status.HTTP_201_CREATED)
 def setup_company(
     setup_data: CompanySetupRequest,
@@ -185,35 +236,19 @@ def setup_company(
     Initial company setup endpoint.
 
     Creates the first company and admin user in one operation.
-
-    **No authentication required** - this is for initial setup.
-
-    **IMPORTANT:** In production, this endpoint should be:
-    - Disabled after initial setup, OR
-    - Protected with a setup key/token, OR
-    - Only accessible from localhost/admin panel
-
-    **Use Case:**
-    - Setting up a new company in the system
-    - Creating the first admin user for that company
-
-    **Example:**
-    ```bash
-    curl -X POST "http://localhost:8000/api/v1/auth/setup" \\
-      -H "Content-Type: application/json" \\
-      -d '{
-        "company_name": "ABC Construction",
-        "company_email": "admin@abc-construction.com",
-        "company_phone": "555-0100",
-        "admin_email": "admin@abc-construction.com",
-        "admin_username": "admin",
-        "admin_password": "SecurePassword123!",
-        "admin_first_name": "John",
-        "admin_last_name": "Doe"
-      }'
-    ```
+    Requires a valid setup token from the magic link flow.
     """
     logger.info(f"Company setup initiated for: {setup_data.company_name}")
+
+    try:
+        # Validate setup token
+        payload = verify_setup_token(setup_data.setup_token)
+        logger.info(f"Setup token verified for email: {payload.get('sub')}")
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired setup token"
+        )
 
     try:
         # Initialize repositories

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from datetime import datetime, date
+from datetime import datetime, date, time
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from decimal import Decimal
@@ -23,6 +23,7 @@ class VisitBase(BaseModel):
     description: Optional[str] = None
     status: VisitStatus = VisitStatus.PLANNING
     visit_date: Optional[date] = None
+    visit_time: Optional[time] = None
     inspection_notes: Optional[str] = None
     estimated_materials_cost: Optional[Decimal] = Field(None, decimal_places=2)
     estimated_labor_cost: Optional[Decimal] = Field(None, decimal_places=2)
@@ -71,6 +72,7 @@ class VisitUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[VisitStatus] = None
     visit_date: Optional[date] = None
+    visit_time: Optional[time] = None
     inspection_notes: Optional[str] = None
     estimated_materials_cost: Optional[Decimal] = Field(None, decimal_places=2)
     estimated_labor_cost: Optional[Decimal] = Field(None, decimal_places=2)

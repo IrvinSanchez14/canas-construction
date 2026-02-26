@@ -71,6 +71,24 @@ class Settings(BaseSettings):
     RESEND_FROM_EMAIL: str = "notifications@canas-construction.com"
     RESEND_FROM_NAME: str = "Canas Construction Notifications"
 
+    # Company Branding
+    COMPANY_LOGO_URL: str = ""
+    COMPANY_NAME: str = "Canas Construction"
+
+    # Setup
+    SETUP_ALLOWED_EMAILS: List[str] = []
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    @field_validator("SETUP_ALLOWED_EMAILS", mode="before")
+    @classmethod
+    def parse_setup_allowed_emails(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [email.strip() for email in v.split(",") if email.strip()]
+        return v
+
     # Feature Flags
     NOTIFICATIONS_ENABLED: bool = True
 
