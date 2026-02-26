@@ -2,10 +2,26 @@ from typing import List, Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
+import os
 
 
 class Settings(BaseSettings):
     """Application settings with AWS best practices."""
+
+    def __init__(self, **kwargs):
+        # pydantic_settings JSON-parses List fields from env vars before
+        # validators run. Empty strings cause JSONDecodeError, so temporarily
+        # remove them to let defaults apply instead.
+        _list_env_vars = ["SETUP_ALLOWED_EMAILS", "CORS_ORIGINS"]
+        _removed = {}
+        for var in _list_env_vars:
+            val = os.environ.get(var)
+            if val is not None and not val.strip():
+                _removed[var] = os.environ.pop(var)
+        try:
+            super().__init__(**kwargs)
+        finally:
+            os.environ.update(_removed)
 
     # Application
     APP_NAME: str = "Canas Construction API"
