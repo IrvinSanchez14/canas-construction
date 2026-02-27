@@ -58,6 +58,7 @@ def create_application() -> FastAPI:
         docs_url=f"{settings.API_PREFIX}/docs" if settings.DEBUG else None,
         redoc_url=f"{settings.API_PREFIX}/redoc" if settings.DEBUG else None,
         openapi_url=f"{settings.API_PREFIX}/openapi.json" if settings.DEBUG else None,
+        redirect_slashes=False,
     )
 
     # OPTIONS Handler Middleware - Handle OPTIONS requests BEFORE they reach endpoints
