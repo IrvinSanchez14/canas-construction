@@ -14,7 +14,8 @@ class EmailService:
     
     def __init__(self):
         resend.api_key = settings.RESEND_API_KEY
-        
+        logger.info(f"[EmailService] Initialized. API key set: {bool(settings.RESEND_API_KEY)}, from: {settings.RESEND_FROM_EMAIL}")
+
         # Setup Jinja2 for email templates
         template_dir = Path(__file__).parent.parent / "templates" / "email"
         self.jinja_env = Environment(

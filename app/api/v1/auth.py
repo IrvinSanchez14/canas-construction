@@ -193,20 +193,25 @@ async def request_setup_link(
     """
     email = request_data.email.lower()
     allowed_emails = [e.lower() for e in settings.SETUP_ALLOWED_EMAILS]
+    logger.info(f"[Setup] Email requested: {email}")
+    logger.info(f"[Setup] Allowed emails: {allowed_emails}")
+    logger.info(f"[Setup] FRONTEND_URL: {settings.FRONTEND_URL}")
+    logger.info(f"[Setup] RESEND_API_KEY set: {bool(settings.RESEND_API_KEY)}")
 
     if email in allowed_emails:
         token = create_setup_token(email)
         setup_url = f"{settings.FRONTEND_URL}/setup/create?token={token}"
+        logger.info(f"[Setup] Generated setup URL: {setup_url}")
 
         email_service = EmailService()
-        await email_service.send_setup_magic_link_email(
+        result = await email_service.send_setup_magic_link_email(
             to=email,
             setup_url=setup_url,
             company_name=settings.COMPANY_NAME
         )
-        logger.info(f"Setup magic link sent to {email}")
+        logger.info(f"[Setup] Email send result: {result}")
     else:
-        logger.info(f"Setup link requested for unauthorized email: {email}")
+        logger.info(f"[Setup] Email NOT in allowed list: {email}")
 
     return SetupLinkResponse()
 
