@@ -48,7 +48,8 @@ class VisitService:
         self,
         visit_data: VisitCreate,
         company_id: UUID,
-        created_by_user_id: Optional[UUID] = None
+        created_by_user_id: Optional[UUID] = None,
+        send_client_notification: bool = False
     ) -> Visit:
         """
         Create a new visit.
@@ -152,6 +153,42 @@ class VisitService:
             ).start()
         except Exception as e:
             logger.error(f"Failed to queue notification: {str(e)}")
+
+        # Send email notification to the project's client if requested
+        if send_client_notification and project.client and project.client.email:
+            try:
+                from app.services.email_service import EmailService
+                import asyncio
+
+                client = project.client
+                email_service = EmailService()
+                details = {
+                    "Project": project.name,
+                    "Visit Date": str(visit.visit_date) if visit.visit_date else "To be determined",
+                    "Visit Time": str(visit.visit_time) if visit.visit_time else "To be determined",
+                    "Status": visit.status.value.replace("_", " ").title(),
+                }
+
+                def _send_client_email():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(
+                            email_service.send_entity_created_email(
+                                to=[client.email],
+                                entity_type="Visit",
+                                entity_name=visit.title,
+                                created_at=str(visit.created_at),
+                                details=details,
+                            )
+                        )
+                    finally:
+                        loop.close()
+
+                threading.Thread(target=_send_client_email, daemon=True).start()
+                logger.info(f"Queued client notification email to {client.email} for visit {visit.id}")
+            except Exception as e:
+                logger.error(f"Failed to queue client notification email: {str(e)}")
 
         return visit
 

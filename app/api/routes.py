@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.api import health
-from app.api.v1 import auth, companies, roles, users, clients, project_categories, projects, catalog_items, visits, budgets, renderings, uploads, notifications, project_attachments, visit_attachments
+from app.api.v1 import auth, companies, roles, users, clients, project_categories, projects, catalog_items, visits, budgets, renderings, uploads, notifications, project_attachments, visit_attachments, references
 
 api_router = APIRouter()
 
@@ -28,6 +28,9 @@ api_router.include_router(visit_attachments.router)
 api_router.include_router(budgets.router)
 api_router.include_router(renderings.router)
 api_router.include_router(uploads.router)
+
+# References
+api_router.include_router(references.router)
 
 # Notifications
 api_router.include_router(notifications.router)

@@ -32,6 +32,7 @@ def create_visit(
     visit: VisitCreate,
     company_id: UUID = Query(..., description="Company ID (REQUIRED for validation)"),
     created_by_user_id: Optional[UUID] = Query(None, description="User ID who is creating this visit (for audit trail)"),
+    send_client_notification: bool = Query(False, description="Send email notification to the project's client"),
     service: VisitService = Depends(get_visit_service)
 ):
     """
@@ -59,7 +60,7 @@ def create_visit(
     **Audit Trail:**
     - Tracks which user created the visit via created_by_user_id
     """
-    return service.create_visit(visit, company_id, created_by_user_id)
+    return service.create_visit(visit, company_id, created_by_user_id, send_client_notification)
 
 
 @router.get("/", response_model=List[VisitDetailResponse])

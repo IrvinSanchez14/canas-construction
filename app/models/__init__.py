@@ -16,6 +16,7 @@ from app.models.category_profit import CategoryProfit
 from app.models.rendering import Rendering, RenderingImage, RenderingItem, RenderingStatus
 from app.models.rendering_version import RenderingVersion
 from app.models.notification import NotificationSettings, NotificationRecipient
+from app.models.reference import Reference
 
 __all__ = [
     "Base",
@@ -47,4 +48,5 @@ __all__ = [
     "RenderingVersion",
     "NotificationSettings",
     "NotificationRecipient",
+    "Reference",
 ]

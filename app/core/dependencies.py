@@ -33,7 +33,8 @@ from app.repositories import (
     RenderingRepository,
     RenderingImageRepository,
     RenderingItemRepository,
-    RenderingVersionRepository
+    RenderingVersionRepository,
+    ReferenceRepository
 )
 from app.services import (
     CompanyService,
@@ -45,7 +46,8 @@ from app.services import (
     ProjectService,
     CatalogItemService,
     VisitService,
-    RenderingService
+    RenderingService,
+    ReferenceService
 )
 from app.core.password import PasswordHasher, password_hasher
 
@@ -377,4 +379,32 @@ def get_rendering_service(db: Session = Depends(get_db)) -> RenderingService:
         budget_repository=budget_repo,
         budget_item_repository=budget_item_repo,
         project_repository=project_repo
+    )
+
+
+# Reference Repository Factory
+
+def get_reference_repository(db: Session = Depends(get_db)) -> ReferenceRepository:
+    """Get Reference repository instance."""
+    return ReferenceRepository(db)
+
+
+# Reference Service Factory
+
+def get_reference_service(db: Session = Depends(get_db)) -> ReferenceService:
+    """
+    Get ReferenceService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured ReferenceService instance
+    """
+    reference_repo = get_reference_repository(db)
+    company_repo = get_company_repository(db)
+
+    return ReferenceService(
+        reference_repository=reference_repo,
+        company_repository=company_repo
     )
