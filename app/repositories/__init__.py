@@ -18,6 +18,7 @@ from app.repositories.rendering_repository import (
 )
 from app.repositories.rendering_version_repository import RenderingVersionRepository
 from app.repositories.reference_repository import ReferenceRepository
+from app.repositories.change_order_repository import ChangeOrderRepository, ChangeOrderItemRepository
 
 __all__ = [
     "BaseRepository",
@@ -39,4 +40,6 @@ __all__ = [
     "RenderingItemRepository",
     "RenderingVersionRepository",
     "ReferenceRepository",
+    "ChangeOrderRepository",
+    "ChangeOrderItemRepository",
 ]

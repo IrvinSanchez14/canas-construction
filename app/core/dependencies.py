@@ -34,7 +34,9 @@ from app.repositories import (
     RenderingImageRepository,
     RenderingItemRepository,
     RenderingVersionRepository,
-    ReferenceRepository
+    ReferenceRepository,
+    ChangeOrderRepository,
+    ChangeOrderItemRepository
 )
 from app.services import (
     CompanyService,
@@ -47,7 +49,8 @@ from app.services import (
     CatalogItemService,
     VisitService,
     RenderingService,
-    ReferenceService
+    ReferenceService,
+    ChangeOrderService
 )
 from app.core.password import PasswordHasher, password_hasher
 
@@ -407,4 +410,49 @@ def get_reference_service(db: Session = Depends(get_db)) -> ReferenceService:
     return ReferenceService(
         reference_repository=reference_repo,
         company_repository=company_repo
+    )
+
+
+# Change Order Repository Factories
+
+def get_change_order_repository(db: Session = Depends(get_db)) -> ChangeOrderRepository:
+    """Get ChangeOrder repository instance."""
+    return ChangeOrderRepository(db)
+
+
+def get_change_order_item_repository(db: Session = Depends(get_db)) -> ChangeOrderItemRepository:
+    """Get ChangeOrderItem repository instance."""
+    return ChangeOrderItemRepository(db)
+
+
+# Change Order Service Factory
+
+def get_change_order_service(db: Session = Depends(get_db)) -> ChangeOrderService:
+    """
+    Get ChangeOrderService with all dependencies injected.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Fully configured ChangeOrderService instance
+    """
+    change_order_repo = get_change_order_repository(db)
+    change_order_item_repo = get_change_order_item_repository(db)
+    budget_repo = get_budget_repository(db)
+    budget_category_repo = get_budget_category_repository(db)
+    budget_item_repo = get_budget_item_repository(db)
+    budget_version_repo = get_budget_version_repository(db)
+    project_repo = get_project_repository(db)
+    user_repo = get_user_repository(db)
+
+    return ChangeOrderService(
+        change_order_repository=change_order_repo,
+        change_order_item_repository=change_order_item_repo,
+        budget_repository=budget_repo,
+        budget_category_repository=budget_category_repo,
+        budget_item_repository=budget_item_repo,
+        budget_version_repository=budget_version_repo,
+        project_repository=project_repo,
+        user_repository=user_repo
     )

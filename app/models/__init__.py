@@ -17,6 +17,7 @@ from app.models.rendering import Rendering, RenderingImage, RenderingItem, Rende
 from app.models.rendering_version import RenderingVersion
 from app.models.notification import NotificationSettings, NotificationRecipient
 from app.models.reference import Reference
+from app.models.change_order import ChangeOrder, ChangeOrderItem, ChangeOrderStatus
 
 __all__ = [
     "Base",
@@ -49,4 +50,7 @@ __all__ = [
     "NotificationSettings",
     "NotificationRecipient",
     "Reference",
+    "ChangeOrder",
+    "ChangeOrderItem",
+    "ChangeOrderStatus",
 ]

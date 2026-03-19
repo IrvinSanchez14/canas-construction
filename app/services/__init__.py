@@ -9,6 +9,7 @@ from app.services.visit_service import VisitService
 from app.services.budget_service import BudgetService
 from app.services.rendering_service import RenderingService
 from app.services.reference_service import ReferenceService
+from app.services.change_order_service import ChangeOrderService
 
 __all__ = [
     "CompanyService",
@@ -22,4 +23,5 @@ __all__ = [
     "BudgetService",
     "RenderingService",
     "ReferenceService",
+    "ChangeOrderService",
 ]

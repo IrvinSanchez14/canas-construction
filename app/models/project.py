@@ -71,6 +71,12 @@ class Project(BaseModel):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     visits = relationship("Visit", back_populates="project", cascade="all, delete-orphan")
     attachments = relationship("ProjectAttachment", back_populates="project", cascade="all, delete-orphan")
+    change_orders = relationship(
+        "ChangeOrder",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ChangeOrder.order_number"
+    )
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', status={self.status}, client_id={self.client_id})>"
